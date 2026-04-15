@@ -1,0 +1,5 @@
+.credit-overview { display: flex; align-items: center; padding: 32rpx 24rpx; }
+.credit-item { flex: 1; text-align: center; }
+.credit-label { display: block; font-size: 24rpx; color: #8C8C8C; margin-bottom: 8rpx; }
+.credit-value { font-size: 40rpx; font-weight: 700; }
+.credit-divider { width: 1rpx; height: 60rpx; background: #F0F0F0; }

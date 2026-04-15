@@ -1,0 +1,57 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/post-detail/post-detail",
+    "pages/post-create/post-create",
+    "pages/submit-task/submit-task",
+    "pages/my-posts/my-posts",
+    "pages/my-orders/my-orders",
+    "pages/profile/profile",
+    "pages/credit/credit",
+    "pages/points/points",
+    "pages/shop/shop"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#1677FF",
+    "navigationBarTitleText": "帮我看看",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F5F5F5",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#8C8C8C",
+    "selectedColor": "#1677FF",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "assets/tab/home.png",
+        "selectedIconPath": "assets/tab/home-active.png"
+      },
+      {
+        "pagePath": "pages/shop/shop",
+        "text": "商城",
+        "iconPath": "assets/tab/shop.png",
+        "selectedIconPath": "assets/tab/shop-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "assets/tab/profile.png",
+        "selectedIconPath": "assets/tab/profile-active.png"
+      }
+    ]
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于显示附近帮看需求和推荐附近帖子"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation",
+    "chooseLocation"
+  ],
+  "sitemapLocation": "sitemap.json"
+}

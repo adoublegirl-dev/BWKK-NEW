@@ -1,0 +1,94 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const config = require('./config');
+const logger = require('./middleware/logger');
+const errorHandler = require('./middleware/error-handler');
+const { apiLimiter } = require('./middleware/rate-limiter');
+const { startJobs } = require('./jobs/timeout-handler');
+
+// 路由
+const authRoutes = require('./routes/auth');
+const postRoutes = require('./routes/posts');
+const orderRoutes = require('./routes/orders');
+const paymentRoutes = require('./routes/payments');
+const userRoutes = require('./routes/users');
+const shopRoutes = require('./routes/shop');
+const uploadRoutes = require('./routes/upload');
+const moderateRoutes = require('./routes/moderate');
+const adminRoutes = require('./routes/admin');
+
+// 管理后台服务（确保默认管理员存在）
+const adminService = require('./services/admin.service');
+
+const app = express();
+
+// ========== 中间件 ==========
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(logger);
+app.use('/api/', apiLimiter);
+
+// 静态文件服务 - 头像等上传文件
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// ========== 路由 ==========
+// 管理后台路由（必须在用户端路由之前注册）
+app.use('/api/admin', adminRoutes);
+
+app.use('/api/auth', authRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/shop', shopRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/moderate', moderateRoutes);
+
+// 健康检查
+app.get('/api/health', (_req, res) => {
+  res.json({
+    code: 200,
+    message: 'ok',
+    data: {
+      name: '帮我看看',
+      version: '1.0.0',
+      paymentMode: config.paymentMode,
+      env: config.nodeEnv,
+    },
+  });
+});
+
+// 404 处理
+app.use((_req, res) => {
+  res.status(404).json({
+    code: 404,
+    message: '接口不存在',
+    data: null,
+  });
+});
+
+// 全局错误处理
+app.use(errorHandler);
+
+// ========== 启动 ==========
+// 确保默认管理员存在
+adminService.ensureDefaultAdmin().then(() => {
+  app.listen(config.port, () => {
+    console.log(`\n🚀 帮我看看服务已启动`);
+    console.log(`   地址: http://localhost:${config.port}`);
+    console.log(`   环境: ${config.nodeEnv}`);
+    console.log(`   支付模式: ${config.paymentMode}\n`);
+
+    // 启动定时任务
+    if (config.nodeEnv !== 'test') {
+      startJobs();
+    }
+  });
+}).catch((err) => {
+  console.error('启动失败:', err);
+  process.exit(1);
+});
+
+module.exports = app;

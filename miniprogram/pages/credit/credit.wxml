@@ -1,0 +1,31 @@
+<view class="page-credit">
+  <view class="card credit-overview">
+    <view class="credit-item" bindtap="onTabChange" data-value="poster">
+      <text class="credit-label">发单信用分</text>
+      <text class="credit-value {{posterCredit >= 80 ? 'text-success' : 'text-danger'}}">{{posterCredit}}</text>
+    </view>
+    <view class="credit-divider"></view>
+    <view class="credit-item" bindtap="onTabChange" data-value="doer">
+      <text class="credit-label">接单信用分</text>
+      <text class="credit-value {{doerCredit >= 80 ? 'text-success' : 'text-danger'}}">{{doerCredit}}</text>
+    </view>
+  </view>
+
+  <!-- 信用记录列表 -->
+  <view class="credit-list" wx:if="{{records.length > 0}}">
+    <view class="credit-record-item" wx:for="{{records}}" wx:key="id">
+      <view class="record-left">
+        <text class="record-type">{{item.type === 'timeout_confirm' ? '⏰ 超时未确认' : item.type === 'report' ? '⚠️ 被举报' : item.type === 'recover' ? '✅ 恢复信用' : '📋 ' + (item.type || '记录')}}</text>
+        <text class="record-reason text-secondary">{{item.reason || '-'}}</text>
+        <text class="record-time text-placeholder">{{item.createdAt}}</text>
+      </view>
+      <view class="record-right">
+        <text class="record-score {{item.change > 0 ? 'text-success' : 'text-danger'}}">{{item.change > 0 ? '+' : ''}}{{item.change}}</text>
+        <text class="record-after text-placeholder">剩余 {{item.afterScore}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="native-loading" wx:elif="{{loading}}"><text>加载中...</text></view>
+  <view class="native-empty" wx:else><text class="native-empty-text">暂无信用记录</text></view>
+</view>

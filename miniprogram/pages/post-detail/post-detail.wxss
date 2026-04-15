@@ -1,0 +1,16 @@
+.page-detail { padding-bottom: 140rpx; }
+.poster-row { display: flex; align-items: center; gap: 16rpx; }
+.avatar { width: 80rpx; height: 80rpx; border-radius: 50%; }
+.avatar-sm { width: 48rpx; height: 48rpx; border-radius: 50%; }
+.poster-info { display: flex; align-items: center; gap: 12rpx; }
+.desc { display: block; line-height: 1.6; margin: 16rpx 0; }
+.meta-list { display: flex; flex-direction: column; gap: 8rpx; }
+.section-title { display: block; font-size: 30rpx; margin-bottom: 16rpx; }
+.submission-item { padding: 20rpx 0; border-bottom: 1rpx solid #F0F0F0; }
+.submission-item:last-child { border-bottom: none; }
+.sub-header { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
+.sub-desc { display: block; font-size: 26rpx; margin-bottom: 12rpx; }
+.sub-images { display: flex; gap: 12rpx; margin-bottom: 12rpx; }
+.sub-img { width: 160rpx; height: 160rpx; border-radius: 8rpx; }
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; background: #FFF; padding: 16rpx 24rpx; box-shadow: 0 -2rpx 12rpx rgba(0,0,0,0.06); }
+.loading-center { padding: 200rpx 0; text-align: center; }

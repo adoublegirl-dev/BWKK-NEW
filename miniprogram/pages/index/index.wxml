@@ -1,0 +1,58 @@
+<view class="page-index">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input" bindtap="onSearch">
+      <text class="text-placeholder">搜索需求...</text>
+    </view>
+    <view class="city-tag" bindtap="onChooseCity">
+      <text class="city-text">📍 {{city}}</text>
+      <text class="city-refresh">↻</text>
+    </view>
+  </view>
+
+  <!-- 筛选标签 -->
+  <view class="filter-tabs">
+    <view class="tab {{currentSort === 'latest' ? 'active' : ''}}" bindtap="onSortChange" data-sort="latest">最新</view>
+    <view class="tab {{currentSort === 'reward' ? 'active' : ''}}" bindtap="onSortChange" data-sort="reward">赏金最高</view>
+    <view class="tab {{currentSort === 'nearest' ? 'active' : ''}}" bindtap="onSortChange" data-sort="nearest">离我最近</view>
+  </view>
+
+  <!-- 帖子列表 -->
+  <view class="post-list" wx:if="{{postList.length > 0}}">
+    <view class="post-card card" wx:for="{{postList}}" wx:key="id" bindtap="onGoDetail" data-id="{{item.id}}">
+      <view class="post-header">
+        <text class="post-title text-bold">{{item.title || '帮我看看'}}</text>
+        <view class="reward-tag">
+          <text class="reward-icon">💰</text>
+          <text class="reward-amount text-primary">{{item.rewardAmount || 0}}积分</text>
+        </view>
+      </view>
+      <text class="post-desc text-secondary text-ellipsis-2">{{item.description}}</text>
+      <view class="post-footer">
+        <view class="post-meta">
+          <text class="text-placeholder" wx:if="{{item.distance}}">📍 {{item.distance}}</text>
+          <text class="text-placeholder" wx:if="{{item.city}}"> · {{item.city}}</text>
+        </view>
+        <view class="post-info">
+          <text class="countdown text-warning" wx:if="{{countdownMap[item.id]}}">⏰ {{countdownMap[item.id]}}</text>
+          <text class="order-count">👥 {{item.orderCount || 0}}人接单</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <view class="native-loading"><text>加载中...</text></view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && postList.length === 0}}">
+    <view class="native-empty"><text class="native-empty-text">暂无帖子，快来发布第一个需求吧</text></view>
+  </view>
+
+  <!-- 悬浮发布按钮 -->
+  <view class="fab" bindtap="onGoCreate">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

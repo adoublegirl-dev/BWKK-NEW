@@ -1,0 +1,24 @@
+<view class="page-my-orders">
+  <view class="native-tabs">
+    <view wx:for="{{tabs}}" wx:key="value" class="native-tab {{currentTab === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onTabChange">{{item.label}}</view>
+  </view>
+  <view class="native-loading" wx:if="{{loading}}"><text>加载中...</text></view>
+  <view class="native-empty" wx:elif="{{orders.length === 0}}"><text class="native-empty-text">暂无接单记录</text></view>
+  <view wx:else>
+    <view class="card" wx:for="{{orders}}" wx:key="id">
+      <view class="flex justify-between items-center">
+        <text class="text-bold text-ellipsis" style="flex:1">{{item.postTitle || '帮我看看'}}</text>
+        <text class="text-primary" style="margin-left:16rpx">💰 {{item.rewardAmount || 0}}</text>
+      </view>
+      <view class="flex justify-between items-center" style="margin-top:12rpx">
+        <text class="text-placeholder">{{item.createdAt}}</text>
+        <view>
+          <button wx:if="{{item.status === 'pending'}}" size="mini" type="primary" data-orderid="{{item.id}}" bindtap="onGoSubmit">去提交</button>
+          <view wx:elif="{{item.status === 'submitted'}}" class="tag tag-warning">待确认</view>
+          <view wx:elif="{{item.status === 'completed'}}" class="tag tag-success">已完成</view>
+          <view wx:else class="tag tag-danger">已失败</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,16 @@
+.points-overview { text-align: center; padding: 40rpx 24rpx; }
+.points-main { margin-bottom: 16rpx; }
+.points-value { display: block; font-size: 72rpx; font-weight: 700; }
+.points-sub { display: flex; justify-content: center; gap: 48rpx; }
+.points-sub view { font-size: 24rpx; }
+.filter-bar { display: flex; background: #FFF; padding: 16rpx 24rpx; gap: 24rpx; }
+.filter-item { font-size: 26rpx; color: #8C8C8C; padding: 8rpx 0; }
+.filter-item.active { color: #1677FF; font-weight: 600; border-bottom: 4rpx solid #1677FF; }
+.tx-list { padding: 0 24rpx; }
+.tx-item { display: flex; justify-content: space-between; align-items: center; padding: 24rpx 0; border-bottom: 1rpx solid #F0F0F0; }
+.tx-type { display: block; font-size: 28rpx; margin-bottom: 4rpx; }
+.tx-title { display: block; font-size: 24rpx; }
+.tx-time { display: block; font-size: 22rpx; margin-top: 4rpx; }
+.tx-right { text-align: right; }
+.tx-amount { display: block; font-size: 32rpx; font-weight: 600; }
+.tx-balance { display: block; font-size: 22rpx; margin-top: 4rpx; }

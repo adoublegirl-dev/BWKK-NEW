@@ -1,0 +1,20 @@
+<view class="page-my-posts">
+  <view class="native-tabs">
+    <view wx:for="{{tabs}}" wx:key="value" class="native-tab {{currentTab === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onTabChange">{{item.label}}</view>
+  </view>
+  <view class="native-loading" wx:if="{{loading}}"><text>加载中...</text></view>
+  <view class="native-empty" wx:elif="{{posts.length === 0}}"><text class="native-empty-text">暂无帖子</text></view>
+  <view wx:else>
+    <view class="card" wx:for="{{posts}}" wx:key="id" bindtap="onGoDetail" data-id="{{item.id}}">
+      <view class="flex justify-between items-center">
+        <text class="text-bold">{{item.title || '帮我看看'}}</text>
+        <text class="text-primary">💰 {{item.rewardAmount || 0}}</text>
+      </view>
+      <text class="text-secondary text-ellipsis-2" style="display:block;margin-top:8rpx">{{item.description}}</text>
+      <view class="flex justify-between" style="margin-top:12rpx">
+        <text class="text-placeholder">👥 {{item.orderCount || 0}}人接单</text>
+        <view class="tag tag-primary">{{item.status === 'active' ? '进行中' : item.status === 'completed' ? '已完成' : '已超时'}}</view>
+      </view>
+    </view>
+  </view>
+</view>

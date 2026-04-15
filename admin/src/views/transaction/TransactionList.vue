@@ -1,0 +1,98 @@
+<template>
+  <div>
+    <el-card shadow="hover" class="search-card">
+      <el-form :inline="true" :model="query">
+        <el-form-item label="用户ID">
+          <el-input v-model="query.userId" placeholder="用户ID" clearable style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="query.type" placeholder="全部" clearable style="width: 120px">
+            <el-option label="冻结" value="freeze" />
+            <el-option label="解冻" value="unfreeze" />
+            <el-option label="收入" value="earn" />
+            <el-option label="支出" value="spend" />
+            <el-option label="退款" value="refund" />
+            <el-option label="补偿" value="compensate" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="时间范围">
+          <el-date-picker v-model="query.dateRange" type="daterange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="YYYY-MM-DD" style="width: 240px" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+          <el-button @click="resetQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <el-card shadow="hover" style="margin-top: 16px">
+      <el-table :data="list" v-loading="loading" stripe>
+        <el-table-column prop="id" label="ID" width="120">
+          <template #default="{ row }">{{ row.id.slice(0, 10) }}...</template>
+        </el-table-column>
+        <el-table-column label="用户" width="140">
+          <template #default="{ row }">
+            <div>{{ row.user?.nickname || '未知' }}</div>
+            <div style="font-size: 12px; color: #999">{{ row.user?.email || '' }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="type" label="类型" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag :type="typeColor(row.type)" size="small">{{ typeLabel(row.type) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="amount" label="金额" width="80" align="center">
+          <template #default="{ row }">{{ row.type === 'spend' || row.type === 'freeze' ? '-' : '+' }}{{ row.amount }}</template>
+        </el-table-column>
+        <el-table-column prop="beforeBalance" label="变动前" width="80" align="center" />
+        <el-table-column prop="afterBalance" label="变动后" width="80" align="center" />
+        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="createdAt" label="时间" width="160">
+          <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
+        </el-table-column>
+      </el-table>
+
+      <el-pagination v-model:current-page="query.page" v-model:page-size="query.pageSize" :total="total" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" style="margin-top: 16px; justify-content: flex-end" @size-change="fetchList" @current-change="fetchList" />
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { getTransactions } from '../../api/admin'
+import dayjs from 'dayjs'
+
+const list = ref([])
+const total = ref(0)
+const loading = ref(false)
+const query = reactive({ page: 1, pageSize: 20, userId: '', type: '', dateRange: null })
+
+const typeMap = {
+  freeze: { label: '冻结', color: 'warning' },
+  unfreeze: { label: '解冻', color: 'success' },
+  earn: { label: '收入', color: 'success' },
+  spend: { label: '支出', color: 'danger' },
+  refund: { label: '退款', color: '' },
+  compensate: { label: '补偿', color: '' },
+}
+
+function typeLabel(t) { return typeMap[t]?.label || t }
+function typeColor(t) { return typeMap[t]?.color || 'info' }
+function formatDate(d) { return dayjs(d).format('YYYY-MM-DD HH:mm') }
+
+async function fetchList() {
+  loading.value = true
+  try {
+    const res = await getTransactions({
+      page: query.page, pageSize: query.pageSize, userId: query.userId, type: query.type,
+      startTime: query.dateRange?.[0] || '', endTime: query.dateRange?.[1] || '',
+    })
+    list.value = res.data; total.value = res.pagination.total
+  } finally { loading.value = false }
+}
+
+function handleSearch() { query.page = 1; fetchList() }
+function resetQuery() { query.userId = ''; query.type = ''; query.dateRange = null; query.page = 1; fetchList() }
+
+onMounted(fetchList)
+</script>

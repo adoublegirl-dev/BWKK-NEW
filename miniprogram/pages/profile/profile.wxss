@@ -1,0 +1,12 @@
+.profile-header { display: flex; flex-direction: column; align-items: center; padding: 48rpx 0 32rpx; }
+.profile-avatar { width: 128rpx; height: 128rpx; border-radius: 50%; margin-bottom: 16rpx; }
+.profile-name { font-size: 34rpx; }
+.points-card { display: flex; align-items: center; justify-content: space-between; padding: 32rpx 24rpx; }
+.points-main { text-align: center; }
+.points-value { display: block; font-size: 56rpx; font-weight: 700; }
+.points-label { font-size: 24rpx; }
+.credit-card { display: flex; align-items: center; }
+.credit-item { flex: 1; text-align: center; }
+.credit-label { display: block; font-size: 24rpx; color: #8C8C8C; margin-bottom: 8rpx; }
+.credit-value { font-size: 40rpx; font-weight: 700; }
+.credit-divider { width: 1rpx; height: 60rpx; background: #F0F0F0; }

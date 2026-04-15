@@ -1,0 +1,29 @@
+<view class="page-submit">
+  <view class="card" wx:if="{{post}}">
+    <text class="label text-bold">原始需求</text>
+    <text class="text-secondary">{{post.description}}</text>
+    <text class="text-placeholder" style="display:block;margin-top:8rpx">📍 {{post.locationName || '未选择'}}</text>
+  </view>
+
+  <view class="card">
+    <text class="label text-bold">上传照片 ({{images.length}}/5)</text>
+    <view class="image-grid">
+      <view class="img-item" wx:for="{{images}}" wx:key="*this">
+        <image src="{{item}}" mode="aspectFill" bindtap="previewImage" data-urls="{{images}}" data-current="{{item}}" />
+        <view class="img-remove" data-index="{{index}}" bindtap="onRemoveImage">×</view>
+      </view>
+      <view class="img-add" wx:if="{{images.length < 5}}" bindtap="onChooseImage">
+        <text class="text-placeholder">+</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="label text-bold">描述 ({{description.length}}/100)</text>
+    <textarea class="native-textarea" value="{{description}}" bindinput="onDescInput" maxlength="100" placeholder="描述你看到的情况..." auto-height />
+  </view>
+
+  <view class="submit-area safe-area-bottom">
+    <button class="native-btn primary block" loading="{{submitting}}" bindtap="onSubmit">提交任务</button>
+  </view>
+</view>

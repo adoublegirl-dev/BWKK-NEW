@@ -1,0 +1,33 @@
+<view class="page-points">
+  <view class="card points-overview">
+    <view class="points-main"><text class="points-value text-primary">{{availablePoints}}</text><text class="text-placeholder">可用积分</text></view>
+    <view class="points-sub">
+      <view><text class="text-secondary">冻结 </text><text>{{frozenPoints}}</text></view>
+      <view><text class="text-secondary">累计 </text><text>{{totalEarned}}</text></view>
+    </view>
+  </view>
+
+  <view class="filter-bar">
+    <text class="filter-item {{currentFilter === 'all' ? 'active' : ''}}" data-type="all" bindtap="onFilterChange">全部</text>
+    <text class="filter-item {{currentFilter === 'earn' ? 'active' : ''}}" data-type="earn" bindtap="onFilterChange">获取</text>
+    <text class="filter-item {{currentFilter === 'spend' ? 'active' : ''}}" data-type="spend" bindtap="onFilterChange">消费</text>
+    <text class="filter-item {{currentFilter === 'refund' ? 'active' : ''}}" data-type="refund" bindtap="onFilterChange">退回</text>
+  </view>
+
+  <view class="tx-list">
+    <view class="tx-item" wx:for="{{transactions}}" wx:key="id">
+      <view class="tx-left">
+        <text class="tx-type">{{item.type === 'earn' ? '🎁 获取' : item.type === 'spend' ? '💰 消费' : item.type === 'freeze' ? '❄️ 冻结' : item.type === 'refund' ? '↩️ 退回' : '📋 其他'}}</text>
+        <text class="tx-title text-secondary">{{item.postTitle || item.description || '-'}}</text>
+        <text class="tx-time text-placeholder">{{item.createdAt}}</text>
+      </view>
+      <view class="tx-right">
+        <text class="tx-amount {{item.amount > 0 ? 'text-success' : 'text-danger'}}">{{item.amount > 0 ? '+' : ''}}{{item.amount}}</text>
+        <text class="tx-balance text-placeholder">余额 {{item.afterBalance}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="native-loading" wx:if="{{loading}}"><text>加载中...</text></view>
+  <view class="native-empty" wx:elif="{{!loading && transactions.length === 0}}"><text class="native-empty-text">暂无记录</text></view>
+</view>

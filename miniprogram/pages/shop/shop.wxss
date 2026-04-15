@@ -1,0 +1,6 @@
+.page-shop { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.coming-soon { text-align: center; padding: 80rpx; }
+.icon { display: block; font-size: 120rpx; margin-bottom: 32rpx; }
+.title { display: block; font-size: 40rpx; font-weight: 700; color: #262626; margin-bottom: 16rpx; }
+.desc { display: block; font-size: 28rpx; color: #595959; margin-bottom: 8rpx; }
+.sub-desc { display: block; font-size: 24rpx; color: #8C8C8C; }

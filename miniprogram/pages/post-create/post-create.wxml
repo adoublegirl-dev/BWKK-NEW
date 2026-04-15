@@ -1,0 +1,46 @@
+<view class="page-create">
+  <view class="card">
+    <text class="label text-bold">地点</text>
+    <view class="location-picker" bindtap="onChooseLocation">
+      <text wx:if="{{locationName}}" class="text-primary">{{locationName}}</text>
+      <text wx:else class="text-placeholder">点击选择地点</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="label text-bold">需求描述</text>
+    <textarea class="native-textarea" value="{{description}}" bindinput="onDescInput" maxlength="200" placeholder="请描述你需要帮忙看什么..." auto-height />
+    <text class="char-count text-placeholder">{{description.length}}/200</text>
+  </view>
+
+  <view class="card">
+    <text class="label text-bold">截止时间</text>
+    <view class="time-row">
+      <picker mode="date" value="{{deadlineDate}}" start="{{today}}" bindchange="onDateChange">
+        <text class="time-value">{{deadlineDate || '选择日期'}}</text>
+      </picker>
+      <picker mode="time" value="{{deadlineTime}}" bindchange="onTimeChange">
+        <text class="time-value">{{deadlineTime || '选择时间'}}</text>
+      </picker>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="label-row">
+      <text class="label text-bold">悬赏积分</text>
+      <text class="text-placeholder">可用: {{availablePoints}}积分</text>
+    </view>
+    <input class="native-input" type="number" value="{{reward}}" placeholder="0为免费互助" bindinput="onRewardInput" />
+    <slider min="0" max="{{availablePoints}}" value="{{reward}}" step="1" activeColor="#1677FF" bindchange="onRewardInput" />
+  </view>
+
+  <view class="card">
+    <text class="label text-bold">未选中补偿 ({{compensateRate}}%)</text>
+    <text class="text-placeholder" style="font-size:22rpx;display:block;margin-bottom:12rpx">发单后不可修改</text>
+    <slider min="0" max="10" value="{{compensateRate}}" step="1" activeColor="#1677FF" bindchange="onCompensateChange" />
+  </view>
+
+  <view class="submit-area safe-area-bottom">
+    <button class="native-btn primary block" loading="{{submitting}}" bindtap="onSubmit">发布需求</button>
+  </view>
+</view>

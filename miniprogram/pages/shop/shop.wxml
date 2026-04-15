@@ -1,0 +1,8 @@
+<view class="page-shop">
+  <view class="coming-soon">
+    <text class="icon">🛒</text>
+    <text class="title">即将上线</text>
+    <text class="desc">积分兑换商城即将上线</text>
+    <text class="sub-desc">未来可使用积分兑换精美商品</text>
+  </view>
+</view>

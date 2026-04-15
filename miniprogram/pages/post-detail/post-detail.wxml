@@ -1,0 +1,46 @@
+<view class="page-detail" wx:if="{{!loading}}">
+  <view class="card post-info">
+    <view class="poster-row">
+      <image class="avatar" src="{{post.poster.avatarUrl || '/assets/default-avatar.png'}}" mode="aspectFill" />
+      <view class="poster-info">
+        <text class="text-bold">{{post.poster.nickname || '用户'}}</text>
+        <view class="tag tag-primary">信用{{post.poster.creditScore || 100}}</view>
+      </view>
+    </view>
+    <view class="divider"></view>
+    <text class="desc">{{post.description}}</text>
+    <view class="meta-list">
+      <view class="meta-item"><text class="text-placeholder">📍 {{post.locationName || post.address || '未选择'}}</text></view>
+      <view class="meta-item"><text class="text-placeholder">⏰ 截止 {{countdown}}</text></view>
+      <view class="meta-item"><text class="text-primary text-bold">💰 {{post.rewardAmount || 0}} 积分</text></view>
+    </view>
+  </view>
+
+  <!-- 提交内容区（发单人可见） -->
+  <view class="card" wx:if="{{isOwner && submissions.length > 0}}">
+    <text class="section-title text-bold">接单人提交 ({{submissions.length}})</text>
+    <view class="submission-item" wx:for="{{submissions}}" wx:key="id">
+      <view class="sub-header">
+        <image class="avatar-sm" src="{{item.doerAvatar || '/assets/default-avatar.png'}}" mode="aspectFill" />
+        <text class="text-bold">{{item.doerName || '接单人'}}</text>
+      </view>
+      <text class="sub-desc text-secondary">{{item.description}}</text>
+      <view class="sub-images" wx:if="{{item.images.length > 0}}">
+        <image wx:for="{{item.images}}" wx:for-item="img" wx:key="*this" class="sub-img" src="{{img}}" mode="aspectFill" bindtap="previewImage" data-urls="{{item.images}}" data-current="{{img}}" />
+      </view>
+      <button size="mini" type="primary" data-orderid="{{item.orderId}}" bindtap="onConfirm">确认选择</button>
+    </view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar safe-area-bottom" wx:if="{{post.status === 'active'}}">
+    <view class="order-count text-placeholder">👥 {{post.orderCount || 0}}人接单</view>
+    <button wx:if="{{actionType === 'idle'}}" class="native-btn primary" bindtap="onAccept">接单</button>
+    <button wx:if="{{actionType === 'accepted'}}" class="native-btn primary" bindtap="onGoSubmit">提交任务</button>
+    <button wx:if="{{actionType === 'submitted'}}" class="native-btn" disabled>等待发单人确认</button>
+    <button wx:if="{{actionType === 'owner'}}" class="native-btn primary" bindtap="loadSubmissions">查看提交 ({{submissions.length}})</button>
+  </view>
+</view>
+
+<view class="native-loading loading-center" wx:if="{{loading}}"><text>加载中...</text></view>
+<view class="native-empty" wx:if="{{!loading && !post}}"><text class="native-empty-text">帖子不存在</text></view>

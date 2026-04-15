@@ -1,0 +1,160 @@
+// This is your Prisma schema file,
+// learn more about it in the screenshots: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ========== 用户表 ==========
+model User {
+  id           String   @id @default(cuid())
+  openid       String   @unique
+  nickname     String?
+  avatarUrl    String?
+  city         String?
+
+  // 信用分
+  posterCredit  Int      @default(100)       // 发单信用分
+  doerCredit    Int      @default(100)       // 接单信用分
+  creditStatus  String   @default("normal")  // normal | frozen | cooldown
+  frozenUntil   DateTime?
+
+  // 积分（MVP）
+  totalPoints   Int      @default(100)       // 累计获得积分
+  frozenPoints  Int      @default(0)         // 冻结中的积分
+  // 可用积分 = totalPoints - frozenPoints
+
+  // 关联
+  posts         Post[]
+  orders        Order[]
+  transactions  Transaction[]
+  creditRecords CreditRecord[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([city])
+  @@map("users")
+}
+
+// ========== 帖子表 ==========
+model Post {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String   @default("帮我看看")
+  description     String
+  locationName    String?
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  rewardAmount    Int      @default(0)        // 悬赏积分（Decimal预留，MVP用Int）
+  compensateRate  Int      @default(0)        // 未选中补偿比例 0-10%
+  deadline        DateTime                   // 截止时间
+  status          String   @default("active") // active | completed | expired | cancelled
+  orderCount      Int      @default(0)        // 接单人数
+
+  // 关联
+  user            User     @relation(fields: [userId], references: [id])
+  orders          Order[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([city])
+  @@map("posts")
+}
+
+// ========== 接单/订单表 ==========
+model Order {
+  id              String   @id @default(cuid())
+  postId          String
+  userId          String                        // 接单人
+  status          String   @default("accepted") // accepted | submitted | selected | rejected | expired
+  description     String?                       // 提交的文字描述
+  images          String?                       // 提交的图片URL，JSON数组字符串
+
+  // 关联
+  post            Post     @relation(fields: [postId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+
+  submittedAt     DateTime?
+  selectedAt      DateTime?                     // 被选中时间（结算时间）
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([postId, userId])                    // 同一用户对同一帖子只能接一次
+  @@index([userId])
+  @@index([postId])
+  @@index([status])
+  @@map("orders")
+}
+
+// ========== 统一交易记录表 ==========
+model Transaction {
+  id              String   @id @default(cuid())
+  userId          String                        // 交易所属用户
+  type            String                        // freeze | unfreeze | earn | spend | refund | compensate
+  amount          Int                            // 交易金额（正数）
+  beforeBalance   Int                            // 交易前余额
+  afterBalance    Int                            // 交易后余额
+  paymentMode     String   @default("points")   // points | wechat（预留）
+  relatedPostId   String?                       // 关联帖子
+  relatedOrderId  String?                       // 关联订单
+  description     String?                       // 交易描述
+
+  // 关联
+  user            User     @relation(fields: [userId], references: [id])
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+// ========== 信用分变动记录表 ==========
+model CreditRecord {
+  id              String   @id @default(cuid())
+  userId          String
+  type            String                        // poster | doer（发单信用/接单信用）
+  change          Int                            // 变动值（负数为扣分）
+  beforeScore     Int                            // 变动前分数
+  afterScore      Int                            // 变动后分数
+  reason          String                        // 变动原因
+  relatedPostId   String?
+
+  // 关联
+  user            User     @relation(fields: [userId], references: [id])
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@map("credit_records")
+}
+
+// ========== 兑换商城商品表（预留，MVP不使用） ==========
+model ShopProduct {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  imageUrl        String?
+  pointsPrice     Int                            // 所需积分
+  stock           Int      @default(0)           // 库存
+  status          String   @default("draft")     // draft | active | soldout | disabled
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("shop_products")
+}
