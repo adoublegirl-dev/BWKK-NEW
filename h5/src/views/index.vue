@@ -57,13 +57,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onActivated } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onActivated, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
 import PostCard from '@/components/PostCard.vue'
 import { getPosts } from '@/api/post'
 
+// 显式声明组件名，匹配 keep-alive :include="['Home']"
+defineOptions({ name: 'Home' })
+
 const router = useRouter()
+const route = useRoute()
 
 const searchKeyword = ref('')
 const postList = ref([])
@@ -75,6 +79,9 @@ const locationLoading = ref(false)
 const locationAttempted = ref(false)
 const page = ref(1)
 const currentSort = ref('latest')
+
+// 防止 van-list @load 和手动调用 loadPosts 并发导致帖子重复
+let isLoading = false
 
 const sortOptions = [
   { label: '最新', value: 'latest', icon: 'clock-o' },
@@ -90,9 +97,18 @@ onMounted(() => {
   // van-list 会自动触发 onLoad，不需要手动调用 loadPosts
 })
 
-// keep-alive 激活时刷新列表（从发布页返回等场景）
+// keep-alive 激活时：
+// - 从发布页返回（query.refresh=1）→ 刷新列表以显示新帖子
+// - 从详情页返回 → 保持当前列表状态和滚动位置
 onActivated(() => {
-  onRefresh()
+  if (route.query.refresh === '1') {
+    // 清理 URL 参数（不触发路由导航）
+    window.history.replaceState({}, '', '/')
+    nextTick(() => {
+      onRefresh()
+    })
+  }
+  // 否则保持当前状态，不刷新
 })
 
 // 获取当前定位
@@ -188,6 +204,10 @@ const refreshLocation = () => {
 
 // 加载帖子列表（由 van-list @load 驱动，不要手动调用 loading guard）
 const loadPosts = async () => {
+  // 防止 van-list @load 和手动调用（onSortChange/onSearch）并发
+  if (isLoading) return
+  isLoading = true
+  
   try {
     const params = {
       page: page.value,
@@ -202,7 +222,8 @@ const loadPosts = async () => {
     // 拦截器已提取 res.data，getPosts 经过 successWithPagination 返回的是数组
     const list = Array.isArray(res) ? res : (res.list || [])
     
-    if (refreshing.value) {
+    // 第一页（排序切换/搜索/刷新）替换列表，后续页追加
+    if (page.value === 1) {
       postList.value = list
     } else {
       postList.value.push(...list)
@@ -221,6 +242,7 @@ const loadPosts = async () => {
     // 出错时结束加载状态，避免一直显示加载中
     finished.value = true
   } finally {
+    isLoading = false
     loading.value = false
     refreshing.value = false
   }

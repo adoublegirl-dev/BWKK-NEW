@@ -36,7 +36,6 @@
       <div v-if="post.locationName" class="post-location">
         <van-icon name="location-o" />
         <span>{{ post.locationName }}</span>
-        <span v-if="post.address" class="address">{{ post.address }}</span>
       </div>
       
       <!-- 悬赏信息 -->
@@ -348,11 +347,6 @@ const onClickLeft = () => {
   background: #f8f8f8;
   border-radius: 8px;
   margin-bottom: 16px;
-}
-
-.post-location .address {
-  color: #999;
-  margin-left: 8px;
 }
 
 .reward-info {
