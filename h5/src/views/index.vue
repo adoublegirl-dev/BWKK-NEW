@@ -19,6 +19,19 @@
       <span v-if="locationLoading" class="location-loading">定位中...</span>
     </div>
     
+    <!-- 排序选项 -->
+    <div class="sort-bar">
+      <div
+        v-for="item in sortOptions"
+        :key="item.value"
+        :class="['sort-item', { active: currentSort === item.value }]"
+        @click="onSortChange(item.value)"
+      >
+        <van-icon :name="item.icon" />
+        <span>{{ item.label }}</span>
+      </div>
+    </div>
+
     <!-- 帖子列表 -->
     <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
       <van-list
@@ -61,6 +74,13 @@ const currentLocation = ref(null)
 const locationLoading = ref(false)
 const locationAttempted = ref(false)
 const page = ref(1)
+const currentSort = ref('latest')
+
+const sortOptions = [
+  { label: '最新', value: 'latest', icon: 'clock-o' },
+  { label: '赏金', value: 'reward', icon: 'gold-coin-o' },
+  { label: '距离', value: 'nearest', icon: 'location-o' },
+]
 
 onMounted(() => {
   // 只在首次进入时尝试自动定位
@@ -172,6 +192,7 @@ const loadPosts = async () => {
     const params = {
       page: page.value,
       pageSize: 10,
+      sort: currentSort.value,
       keyword: searchKeyword.value || undefined,
       latitude: currentLocation.value?.latitude,
       longitude: currentLocation.value?.longitude
@@ -219,6 +240,20 @@ const onLoad = () => {
 
 // 搜索
 const onSearch = () => {
+  page.value = 1
+  postList.value = []
+  finished.value = false
+  loadPosts()
+}
+
+// 切换排序
+const onSortChange = (sort) => {
+  if (sort === 'nearest' && !currentLocation.value) {
+    showToast('请先开启定位权限')
+    return
+  }
+  if (currentSort.value === sort) return
+  currentSort.value = sort
   page.value = 1
   postList.value = []
   finished.value = false
@@ -293,5 +328,32 @@ const goToProfile = () => {
 
 .post-list {
   padding: 12px;
+}
+
+.sort-bar {
+  display: flex;
+  padding: 8px 16px;
+  background: white;
+  gap: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sort-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  color: #666;
+  background: #f5f5f5;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sort-item.active {
+  color: #07c160;
+  background: rgba(7, 193, 96, 0.1);
+  font-weight: 500;
 }
 </style>

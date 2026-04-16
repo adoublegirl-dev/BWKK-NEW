@@ -374,6 +374,8 @@ function formatPostListItem(post) {
     title: post.title,
     description: post.description.slice(0, 80), // 摘要
     locationName: post.locationName,
+    latitude: post.latitude,
+    longitude: post.longitude,
     rewardAmount: post.rewardAmount,
     orderCount: post._count.orders,
     deadline: post.deadline,
