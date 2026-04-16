@@ -23,6 +23,9 @@ const adminService = require('./services/admin.service');
 
 const app = express();
 
+// Nginx 反向代理：信任第一级代理，正确识别客户端 IP
+app.set('trust proxy', 1);
+
 // ========== 中间件 ==========
 app.use(cors());
 app.use(express.json());
@@ -60,7 +63,27 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// 404 处理
+// ========== 生产环境：静态文件 + SPA fallback ==========
+// H5 前端静态文件
+app.use(express.static(path.join(__dirname, '../../h5')));
+// Admin 前端静态文件
+app.use('/admin', express.static(path.join(__dirname, '../../admin')));
+
+// H5 SPA fallback（非 API 路径返回 index.html）
+app.get('*', (req, res, next) => {
+  // 跳过 API 和上传文件请求
+  if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+    return next();
+  }
+  // Admin SPA fallback
+  if (req.path.startsWith('/admin')) {
+    return res.sendFile(path.join(__dirname, '../../admin/index.html'));
+  }
+  // H5 SPA fallback
+  res.sendFile(path.join(__dirname, '../../h5/index.html'));
+});
+
+// 404 处理（仅对 API 请求生效）
 app.use((_req, res) => {
   res.status(404).json({
     code: 404,
