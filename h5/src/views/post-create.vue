@@ -187,7 +187,9 @@ const onSubmit = async () => {
     
     await createPost(data)
     showSuccessToast('发布成功')
-    router.replace('/')
+    setTimeout(() => {
+      router.replace('/')
+    }, 1000)
   } catch (error) {
     showFailToast(error.message || '发布失败')
   } finally {

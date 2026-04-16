@@ -135,6 +135,7 @@ const onSearch = async () => {
       showToast('未找到相关地点')
     }
   } catch (error) {
+    console.error('POI搜索异常:', error)
     showToast('搜索失败，请重试')
   } finally {
     loading.value = false
@@ -145,29 +146,32 @@ const onSearch = async () => {
 const searchPOI = (keyword) => {
   return new Promise((resolve, reject) => {
     if (!window.AMap) {
-      // 高德地图未加载时，使用浏览器定位作为兜底
+      console.warn('AMap 未加载，无法搜索')
       resolve([])
       return
     }
     
-    const placeSearch = new window.AMap.PlaceSearch({
-      pageSize: 20,
-      pageIndex: 1
-    })
-    
-    placeSearch.search(keyword, (status, result) => {
-      if (status === 'complete' && result.info === 'OK') {
-        const pois = result.poiList.pois.map(poi => ({
-          id: poi.id,
-          name: poi.name,
-          address: poi.address,
-          latitude: poi.location.lat,
-          longitude: poi.location.lng
-        }))
-        resolve(pois)
-      } else {
-        resolve([])
-      }
+    window.AMap.plugin(['AMap.PlaceSearch'], () => {
+      const placeSearch = new window.AMap.PlaceSearch({
+        pageSize: 20,
+        pageIndex: 1
+      })
+      
+      placeSearch.search(keyword, (status, result) => {
+        if (status === 'complete' && result.poiList) {
+          const pois = (result.poiList.pois || []).map(poi => ({
+            id: poi.id,
+            name: poi.name,
+            address: poi.address || '',
+            latitude: poi.location ? poi.location.lat : 0,
+            longitude: poi.location ? poi.location.lng : 0
+          }))
+          resolve(pois)
+        } else {
+          console.warn('PlaceSearch 返回:', status, result)
+          resolve([])
+        }
+      })
     })
   })
 }
@@ -179,17 +183,21 @@ const getCurrentLocation = async () => {
   try {
     const position = await getBrowserLocation()
     
-    // 反向地理编码获取地址
     let name = '当前位置'
     let address = ''
     
+    // 反向地理编码获取实际地址（确保插件已加载）
     if (window.AMap) {
       try {
         const addr = await reverseGeocode(position.latitude, position.longitude)
-        name = addr.name || '当前位置'
-        address = addr.address
+        if (addr && addr.name) {
+          name = addr.name
+        }
+        if (addr && addr.address) {
+          address = addr.address
+        }
       } catch (e) {
-        // 反向编码失败，使用默认名称
+        console.warn('反向地理编码失败，使用默认名称:', e)
       }
     }
     
@@ -204,13 +212,14 @@ const getCurrentLocation = async () => {
     selectLocation(location)
     showSuccessToast('定位成功')
   } catch (error) {
+    console.warn('定位失败:', error.message || error)
     showFailToast('定位失败，请检查定位权限')
   } finally {
     locating.value = false
   }
 }
 
-// 浏览器定位
+// 浏览器定位（高精度失败后自动降级低精度）
 const getBrowserLocation = () => {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -219,20 +228,20 @@ const getBrowserLocation = () => {
     }
     
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        })
-      },
+      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
       (error) => {
-        reject(error)
+        // 高精度失败时降级低精度重试
+        if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+            (err) => reject(err),
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          )
+        } else {
+          reject(error)
+        }
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     )
   })
 }
@@ -245,17 +254,23 @@ const reverseGeocode = (lat, lng) => {
       return
     }
     
-    const geocoder = new window.AMap.Geocoder()
-    
-    geocoder.getAddress([lng, lat], (status, result) => {
-      if (status === 'complete' && result.regeocode) {
-        const regeocode = result.regeocode
-        resolve({
-          name: regeocode.formattedAddress,
-          address: regeocode.formattedAddress
+    window.AMap.plugin(['AMap.Geocoder'], () => {
+      try {
+        const geocoder = new window.AMap.Geocoder()
+        geocoder.getAddress([lng, lat], (status, result) => {
+          if (status === 'complete' && result.regeocode) {
+            const regeocode = result.regeocode
+            resolve({
+              name: regeocode.formattedAddress,
+              address: regeocode.formattedAddress
+            })
+          } else {
+            console.warn('逆地理编码返回非 complete 状态:', status)
+            reject(new Error('逆地理编码失败: ' + status))
+          }
         })
-      } else {
-        reject(new Error('逆地理编码失败'))
+      } catch (e) {
+        reject(e)
       }
     })
   })

@@ -87,47 +87,78 @@ const getCurrentLocation = async (force = false) => {
   locationAttempted.value = true
   
   try {
-    const position = await new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('浏览器不支持定位'))
-        return
-      }
-      
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          resolve({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude
-          })
-        },
-        (error) => {
-          reject(error)
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
-      )
-    })
+    const position = await getBrowserLocation()
     
-    currentLocation.value = position
+    currentLocation.value = {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      name: '定位中...'
+    }
     
-    // 反向地理编码获取地址名称
+    // 反向地理编码获取地址名称（确保插件已加载）
     if (window.AMap) {
-      const geocoder = new window.AMap.Geocoder()
-      geocoder.getAddress([position.longitude, position.latitude], (status, result) => {
-        if (status === 'complete' && result.regeocode) {
-          currentLocation.value.name = result.regeocode.formattedAddress
+      window.AMap.plugin(['AMap.Geocoder'], () => {
+        try {
+          const geocoder = new window.AMap.Geocoder()
+          geocoder.getAddress([position.longitude, position.latitude], (status, result) => {
+            if (status === 'complete' && result.regeocode) {
+              currentLocation.value = {
+                ...currentLocation.value,
+                name: result.regeocode.formattedAddress || '当前位置'
+              }
+            } else {
+              console.warn('逆地理编码返回非 complete 状态:', status)
+              currentLocation.value = {
+                ...currentLocation.value,
+                name: '当前位置'
+              }
+            }
+          })
+        } catch (e) {
+          console.error('逆地理编码异常:', e)
+          currentLocation.value = { ...currentLocation.value, name: '当前位置' }
         }
       })
     }
   } catch (error) {
-    console.log('定位失败:', error)
-    showToast('定位失败，请检查定位权限')
+    console.warn('定位失败:', error.message || error.code)
+    // 自动定位失败时不弹 Toast 避免打扰，用户可手动点击刷新
+    if (force) {
+      showToast('定位失败，请检查定位权限')
+    }
   } finally {
     locationLoading.value = false
   }
+}
+
+// 浏览器定位（高精度失败后自动降级低精度）
+const getBrowserLocation = () => {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('浏览器不支持定位'))
+      return
+    }
+    
+    // 先尝试高精度定位
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+      },
+      (error) => {
+        // 高精度失败，降级低精度重试（timeout/position_unavailable 时重试）
+        if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+            (err) => reject(err),
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          )
+        } else {
+          reject(error)
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    )
+  })
 }
 
 // 刷新定位（用户手动点击）
