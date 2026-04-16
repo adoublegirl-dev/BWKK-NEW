@@ -139,9 +139,8 @@ async function getDashboard() {
         title: true,
         status: true,
         rewardAmount: true,
-        city: true,
         createdAt: true,
-        user: { select: { nickname: true } },
+        user: { select: { nickname: true, city: true } },
       },
     }),
   ]);
@@ -342,7 +341,7 @@ async function getPosts({ page = 1, pageSize = 20, status = '', city = '', start
   }
 
   if (city) {
-    where.city = city;
+    where.user = { ...where.user, city };
   }
 
   if (startTime || endTime) {
