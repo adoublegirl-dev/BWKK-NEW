@@ -63,7 +63,8 @@ model Post {
   compensateRate  Int      @default(0)        // 未选中补偿比例 0-10%
   deadline        DateTime                   // 截止时间
   status          String   @default("active") // active | completed | expired | cancelled
-  orderCount      Int      @default(0)        // 接单人数
+  orderCount              Int      @default(0)        // 接单人数
+  lastViewedSubmissionsAt DateTime?                    // 发单人上次查看提交列表的时间
 
   // 关联
   user            User     @relation(fields: [userId], references: [id])
@@ -93,6 +94,7 @@ model Order {
 
   submittedAt     DateTime?
   selectedAt      DateTime?                     // 被选中时间（结算时间）
+  lastViewedAt    DateTime?                     // 接单人上次查看此订单的时间
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

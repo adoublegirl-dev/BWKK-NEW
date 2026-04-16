@@ -28,6 +28,9 @@ router.delete('/posts/:id', ctrl.deletePost);
 // 订单管理
 router.get('/orders', ctrl.getOrders);
 router.get('/orders/:id', ctrl.getOrderDetail);
+router.post('/orders/:id/confirm', ctrl.adminConfirmOrder);
+router.post('/orders/:id/reject', ctrl.adminRejectOrder);
+router.put('/orders/:id/status', ctrl.updateOrderStatus);
 
 // 交易记录
 router.get('/transactions', ctrl.getTransactions);

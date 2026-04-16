@@ -4,7 +4,19 @@
     <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
       <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="onLoad">
         <div class="post-list">
-          <PostCard v-for="post in postList" :key="post.id" :post="post" @click="goToDetail(post)" />
+          <div
+            v-for="post in postList"
+            :key="post.id"
+            class="post-item-wrapper"
+            @click="goToDetail(post)"
+          >
+            <PostCard :post="post" />
+            <van-badge
+              v-if="post.unreadSubmissions > 0"
+              :content="post.unreadSubmissions"
+              class="post-badge"
+            />
+          </div>
         </div>
         <van-empty v-if="postList.length === 0 && !loading" description="暂无帖子" />
       </van-list>
@@ -31,7 +43,7 @@ const loadPosts = async () => {
   loading.value = true
   try {
     const res = await getMyPosts()
-    postList.value = Array.isArray(res) ? res : (res.posts || [])
+    postList.value = res?.list || (Array.isArray(res) ? res : [])
     finished.value = true
   } catch (error) {
     showToast('加载失败')
@@ -49,4 +61,12 @@ const onClickLeft = () => router.back()
 <style scoped>
 .my-posts-page { min-height: 100vh; background: #f5f5f5; }
 .post-list { padding: 12px; }
+.post-item-wrapper {
+  position: relative;
+}
+.post-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
 </style>

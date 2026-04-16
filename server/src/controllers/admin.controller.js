@@ -196,6 +196,40 @@ async function getOrderDetail(req, res, next) {
   }
 }
 
+async function adminConfirmOrder(req, res, next) {
+  try {
+    const data = await service.adminConfirmOrder(req.params.id);
+    await service.createLog(req.admin.id, 'admin_confirm_order', 'order', req.params.id, '管理员强制选中订单');
+    success(res, data, '已强制选中');
+  } catch (err) {
+    next(new ApiError(400, err.message));
+  }
+}
+
+async function adminRejectOrder(req, res, next) {
+  try {
+    const data = await service.adminRejectOrder(req.params.id);
+    await service.createLog(req.admin.id, 'admin_reject_order', 'order', req.params.id, '管理员驳回订单');
+    success(res, data, '已驳回');
+  } catch (err) {
+    next(new ApiError(400, err.message));
+  }
+}
+
+async function updateOrderStatus(req, res, next) {
+  try {
+    const { status } = req.body;
+    if (!status) {
+      return fail(res, '请提供新的订单状态', 400);
+    }
+    const data = await service.updateOrderStatus(req.params.id, status);
+    await service.createLog(req.admin.id, 'admin_update_order', 'order', req.params.id, { status });
+    success(res, data, '订单状态已更新');
+  } catch (err) {
+    next(new ApiError(400, err.message));
+  }
+}
+
 // ========== 交易记录 ==========
 
 async function getTransactions(req, res, next) {
@@ -277,6 +311,9 @@ module.exports = {
   deletePost,
   getOrders,
   getOrderDetail,
+  adminConfirmOrder,
+  adminRejectOrder,
+  updateOrderStatus,
   getTransactions,
   getCreditRecords,
   getLogs,

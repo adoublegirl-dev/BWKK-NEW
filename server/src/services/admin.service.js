@@ -57,11 +57,18 @@ async function login(username, password) {
 
 /**
  * 确保初始管理员存在
+ * 仅在数据库中无任何管理员时创建，密码通过环境变量 ADMIN_DEFAULT_PASSWORD 配置
  */
 async function ensureDefaultAdmin() {
   const count = await prisma.adminUser.count();
   if (count === 0) {
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const defaultPwd = process.env.ADMIN_DEFAULT_PASSWORD;
+    if (!defaultPwd) {
+      console.error('❌ 数据库中无管理员账号，且未配置 ADMIN_DEFAULT_PASSWORD 环境变量');
+      console.error('请在 .env 中添加 ADMIN_DEFAULT_PASSWORD=你的密码 后重启');
+      return;
+    }
+    const hashedPassword = await bcrypt.hash(defaultPwd, 10);
     await prisma.adminUser.create({
       data: {
         username: 'admin',
@@ -69,7 +76,7 @@ async function ensureDefaultAdmin() {
         role: 'super_admin',
       },
     });
-    console.log('✅ 已创建默认管理员账号: admin / admin123');
+    console.log('✅ 已创建默认管理员账号（密码来自环境变量）');
   }
 }
 
@@ -477,6 +484,219 @@ async function getOrderDetail(id) {
   return order;
 }
 
+/**
+ * 管理员强制选中某个接单人
+ * 复用 confirmOrder 的积分结算逻辑，但跳过发单人权限检查
+ */
+async function adminConfirmOrder(orderId) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { post: true },
+  });
+
+  if (!order) throw new Error('订单不存在');
+  if (order.status !== 'submitted') throw new Error('只能选中已提交任务的订单');
+
+  const post = order.post;
+  const posterId = post.userId;
+
+  // 使用事务保证原子性
+  await prisma.$transaction(async (tx) => {
+    // 1. 积分结算
+    if (post.rewardAmount > 0) {
+      const freezeTx = await tx.transaction.findFirst({
+        where: { userId: posterId, relatedOrderId: post.id, type: 'freeze' },
+      });
+      if (!freezeTx) {
+        throw new Error('未找到冻结交易记录，无法结算');
+      }
+      const amount = freezeTx.amount;
+
+      // 发单人：减少冻结积分和总积分
+      const fromUser = await tx.user.update({
+        where: { id: posterId },
+        data: {
+          frozenPoints: { decrement: amount },
+          totalPoints: { decrement: amount },
+        },
+      });
+
+      // 接单人：增加总积分
+      const toUser = await tx.user.update({
+        where: { id: order.userId },
+        data: { totalPoints: { increment: amount } },
+      });
+
+      // 记录发单人支出
+      await tx.transaction.create({
+        data: {
+          userId: posterId,
+          type: 'spend',
+          amount,
+          beforeBalance: fromUser.totalPoints + amount - fromUser.frozenPoints - amount,
+          afterBalance: fromUser.totalPoints - fromUser.frozenPoints,
+          paymentMode: 'points',
+          relatedOrderId: post.id,
+          description: `[管理员操作] 结算支付 ${amount} 积分`,
+        },
+      });
+
+      // 记录接单人收入
+      await tx.transaction.create({
+        data: {
+          userId: order.userId,
+          type: 'earn',
+          amount,
+          beforeBalance: toUser.totalPoints - amount,
+          afterBalance: toUser.totalPoints,
+          paymentMode: 'points',
+          relatedOrderId: post.id,
+          description: `完成任务获得 ${amount} 积分`,
+        },
+      });
+
+      // 标记冻结交易为已结算
+      await tx.transaction.update({
+        where: { id: freezeTx.id },
+        data: { description: `[管理员操作] 已结算给接单人 ${amount} 积分` },
+      });
+    }
+
+    // 2. 标记选中订单
+    await tx.order.update({
+      where: { id: orderId },
+      data: { status: 'selected', selectedAt: new Date() },
+    });
+
+    // 3. 驳回其他已提交的订单，并发放补偿
+    const otherOrders = await tx.order.findMany({
+      where: {
+        postId: post.id,
+        status: 'submitted',
+        id: { not: orderId },
+      },
+    });
+
+    if (otherOrders.length > 0 && post.rewardAmount > 0 && post.compensateRate > 0) {
+      const compensationPerOrder = Math.floor(
+        post.rewardAmount * post.compensateRate / 100 / otherOrders.length
+      );
+
+      for (const otherOrder of otherOrders) {
+        await tx.order.update({
+          where: { id: otherOrder.id },
+          data: { status: 'rejected' },
+        });
+
+        if (compensationPerOrder > 0) {
+          const fromUser = await tx.user.update({
+            where: { id: posterId },
+            data: { totalPoints: { decrement: compensationPerOrder } },
+          });
+
+          const toUser = await tx.user.update({
+            where: { id: otherOrder.userId },
+            data: { totalPoints: { increment: compensationPerOrder } },
+          });
+
+          await tx.transaction.create({
+            data: {
+              userId: posterId,
+              type: 'spend',
+              amount: compensationPerOrder,
+              beforeBalance: fromUser.totalPoints + compensationPerOrder,
+              afterBalance: fromUser.totalPoints,
+              paymentMode: 'points',
+              relatedOrderId: post.id,
+              description: `[管理员操作] 未选中补偿 ${compensationPerOrder} 积分`,
+            },
+          });
+
+          await tx.transaction.create({
+            data: {
+              userId: otherOrder.userId,
+              type: 'compensate',
+              amount: compensationPerOrder,
+              beforeBalance: toUser.totalPoints - compensationPerOrder,
+              afterBalance: toUser.totalPoints,
+              paymentMode: 'points',
+              relatedOrderId: post.id,
+              description: `未选中补偿 ${compensationPerOrder} 积分`,
+            },
+          });
+        }
+      }
+    } else if (otherOrders.length > 0) {
+      await tx.order.updateMany({
+        where: {
+          postId: post.id,
+          status: 'submitted',
+          id: { not: orderId },
+        },
+        data: { status: 'rejected' },
+      });
+    }
+
+    // 4. 驳回仍在accepted状态的订单
+    await tx.order.updateMany({
+      where: {
+        postId: post.id,
+        status: 'accepted',
+      },
+      data: { status: 'expired' },
+    });
+
+    // 5. 标记帖子完成
+    await tx.post.update({
+      where: { id: post.id },
+      data: { status: 'completed' },
+    });
+  });
+
+  return { message: '已强制选中该接单人' };
+}
+
+/**
+ * 管理员驳回某个接单
+ * 不触发积分结算，仅标记为 rejected
+ */
+async function adminRejectOrder(orderId) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { post: true },
+  });
+
+  if (!order) throw new Error('订单不存在');
+  if (!['accepted', 'submitted'].includes(order.status)) {
+    throw new Error('只能驳回已接单或已提交状态的订单');
+  }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: 'rejected' },
+  });
+
+  return { message: '已驳回该接单' };
+}
+
+/**
+ * 管理员修改订单状态
+ */
+async function updateOrderStatus(id, status) {
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order) throw new Error('订单不存在');
+
+  const validStatuses = ['accepted', 'submitted', 'selected', 'rejected', 'expired'];
+  if (!validStatuses.includes(status)) {
+    throw new Error(`无效的订单状态: ${status}`);
+  }
+
+  return prisma.order.update({
+    where: { id },
+    data: { status },
+  });
+}
+
 // ========== 交易记录 ==========
 
 async function getTransactions({ page = 1, pageSize = 20, userId = '', type = '', startTime = '', endTime = '' }) {
@@ -595,6 +815,9 @@ module.exports = {
   deletePost,
   getOrders,
   getOrderDetail,
+  adminConfirmOrder,
+  adminRejectOrder,
+  updateOrderStatus,
   getTransactions,
   getCreditRecords,
   getLogs,

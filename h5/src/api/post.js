@@ -19,3 +19,13 @@ export const createPost = (data) => {
 export const cancelPost = (id) => {
   return request.delete(`/posts/${id}`)
 }
+
+// 获取帖子未读 badge
+export const getPostBadges = () => {
+  return request.get('/posts/badges')
+}
+
+// 标记帖子提交列表已读
+export const viewSubmissions = (postId) => {
+  return request.post(`/posts/view-submissions/${postId}`)
+}

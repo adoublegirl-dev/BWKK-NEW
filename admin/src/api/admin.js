@@ -23,6 +23,9 @@ export const deletePost = (id) => request.delete(`/posts/${id}`)
 // 订单管理
 export const getOrders = (params) => request.get('/orders', { params })
 export const getOrderDetail = (id) => request.get(`/orders/${id}`)
+export const adminConfirmOrder = (id) => request.post(`/orders/${id}/confirm`)
+export const adminRejectOrder = (id) => request.post(`/orders/${id}/reject`)
+export const updateOrderStatus = (id, data) => request.put(`/orders/${id}/status`, data)
 
 // 交易记录
 export const getTransactions = (params) => request.get('/transactions', { params })

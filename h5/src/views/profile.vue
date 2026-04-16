@@ -1,7 +1,7 @@
 <template>
   <div class="profile-page">
     <div class="profile-header">
-      <van-image round width="80" height="80" :src="avatarDisplay" fit="cover" />
+      <van-image round width="80" height="80" :src="avatarDisplay" fit="cover" @error="onAvatarError" />
       <div class="user-name">{{ userInfo?.nickname || '未设置昵称' }}</div>
       <div class="user-id">ID: {{ userInfo?.id?.slice(-8) }}</div>
     </div>
@@ -25,8 +25,18 @@
     
     <van-cell-group inset class="menu-group">
       <van-cell title="编辑资料" icon="edit" is-link to="/profile/edit" />
-      <van-cell title="我的帖子" icon="orders-o" is-link to="/my/posts" />
-      <van-cell title="我的接单" icon="records" is-link to="/my/orders" />
+      <van-cell title="我的帖子" icon="orders-o" is-link to="/my/posts">
+        <template #right-icon>
+          <van-badge v-if="unreadSubmissions > 0" :content="unreadSubmissions" />
+          <van-icon v-else name="arrow" />
+        </template>
+      </van-cell>
+      <van-cell title="我的接单" icon="records" is-link to="/my/orders">
+        <template #right-icon>
+          <van-badge v-if="hasOrderRedDot" is-dot />
+          <van-icon v-else name="arrow" />
+        </template>
+      </van-cell>
       <van-cell title="积分明细" icon="gold-coin-o" is-link to="/points" />
       <van-cell title="信用分" icon="certificate" is-link to="/credit" />
       <van-cell title="积分商城" icon="shop-o" is-link to="/shop" />
@@ -48,21 +58,49 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onActivated } from 'vue'
+import { computed, ref, watch, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
 import { getProfile } from '@/api/user'
+import { getPostBadges } from '@/api/post'
+import { getOrderBadges } from '@/api/order'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const userInfo = computed(() => authStore.userInfo)
 const availablePoints = computed(() => authStore.availablePoints)
 
+// 红点/未读数据
+const unreadSubmissions = ref(0)
+const hasOrderRedDot = ref(false)
+
 // 头像显示：有URL显示URL，否则显示默认猫图
-const avatarDisplay = computed(() => {
-  return userInfo.value?.avatarUrl || 'https://img.yzcdn.cn/vant/cat.jpeg'
-})
+const avatarDisplay = ref('https://img.yzcdn.cn/vant/cat.jpeg')
+
+// 监听用户信息变化更新头像
+watch(() => authStore.userInfo, (val) => {
+  avatarDisplay.value = val?.avatarUrl || 'https://img.yzcdn.cn/vant/cat.jpeg'
+}, { immediate: true })
+
+// 头像加载失败替换为默认
+const onAvatarError = () => {
+  avatarDisplay.value = 'https://img.yzcdn.cn/vant/cat.jpeg'
+}
+
+// 刷新 badge 数据
+const loadBadges = async () => {
+  try {
+    const [postRes, orderRes] = await Promise.all([
+      getPostBadges(),
+      getOrderBadges(),
+    ])
+    unreadSubmissions.value = postRes?.unreadSubmissions || 0
+    hasOrderRedDot.value = !!orderRes?.hasRedDot
+  } catch {
+    // 静默失败
+  }
+}
 
 // 刷新用户资料
 const refreshProfile = async () => {
@@ -77,11 +115,13 @@ const refreshProfile = async () => {
 // 挂载时刷新
 onMounted(() => {
   refreshProfile()
+  loadBadges()
 })
 
 // keep-alive 激活时也刷新（从编辑页返回等场景）
 onActivated(() => {
   refreshProfile()
+  loadBadges()
 })
 
 const bindWechat = () => {

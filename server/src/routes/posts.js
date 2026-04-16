@@ -14,6 +14,8 @@ const postController = require('../controllers/post.controller');
  */
 router.get('/', postController.getPosts);
 router.get('/my-posts', authMiddleware, postController.getMyPosts);
+router.get('/badges', authMiddleware, postController.getPostBadges);
+router.post('/view-submissions/:id', authMiddleware, postController.viewSubmissions);
 router.get('/:id', optionalAuth, postController.getPostDetail);
 router.post('/', authMiddleware, postLimiter, postController.createPost);
 router.put('/:id', authMiddleware, postController.updatePost);

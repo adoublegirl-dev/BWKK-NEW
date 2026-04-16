@@ -80,4 +80,30 @@ const confirmOrder = async (req, res, next) => {
   }
 };
 
-module.exports = { acceptOrder, getMyOrders, submitTask, getSubmissions, confirmOrder };
+/**
+ * 标记订单已查看
+ * POST /api/orders/:id/view
+ */
+const viewOrder = async (req, res, next) => {
+  try {
+    const result = await orderService.viewOrder(req.user.id, req.params.id);
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 获取订单 badge 信息
+ * GET /api/orders/badges
+ */
+const getOrderBadges = async (req, res, next) => {
+  try {
+    const result = await orderService.getOrderBadges(req.user.id);
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { acceptOrder, getMyOrders, submitTask, getSubmissions, confirmOrder, viewOrder, getOrderBadges };

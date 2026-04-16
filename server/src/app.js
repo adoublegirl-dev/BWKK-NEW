@@ -23,6 +23,15 @@ const adminService = require('./services/admin.service');
 
 const app = express();
 
+// 启动时校验关键安全配置
+const requiredEnvVars = ['JWT_SECRET', 'ADMIN_JWT_SECRET'];
+const missing = requiredEnvVars.filter(v => !process.env[v]);
+if (missing.length > 0) {
+  console.error(`\n❌ 缺少必要的环境变量: ${missing.join(', ')}`);
+  console.error('请在 .env 文件中配置这些变量后重启服务。\n');
+  process.exit(1);
+}
+
 // Nginx 反向代理：信任第一级代理，正确识别客户端 IP
 app.set('trust proxy', 1);
 

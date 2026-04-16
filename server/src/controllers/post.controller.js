@@ -103,4 +103,30 @@ const getMyPosts = async (req, res, next) => {
   }
 };
 
-module.exports = { getPosts, getPostDetail, createPost, updatePost, deletePost, getMyPosts };
+/**
+ * 标记帖子提交列表已读
+ * POST /api/posts/view-submissions/:id
+ */
+const viewSubmissions = async (req, res, next) => {
+  try {
+    const result = await postService.viewSubmissions(req.user.id, req.params.id);
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 获取帖子未读 badge 数
+ * GET /api/posts/badges
+ */
+const getPostBadges = async (req, res, next) => {
+  try {
+    const result = await postService.getPostBadges(req.user.id);
+    success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getPosts, getPostDetail, createPost, updatePost, deletePost, getMyPosts, viewSubmissions, getPostBadges };

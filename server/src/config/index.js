@@ -14,7 +14,7 @@ module.exports = {
 
   // JWT
   jwt: {
-    secret: process.env.JWT_SECRET || 'dev-secret-key',
+    secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
 
@@ -52,7 +52,7 @@ module.exports = {
 
   // 管理员 JWT（与普通用户隔离）
   admin: {
-    jwtSecret: process.env.ADMIN_JWT_SECRET || 'admin-secret-key-2024',
+    jwtSecret: process.env.ADMIN_JWT_SECRET,
     jwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '24h',
   },
 };

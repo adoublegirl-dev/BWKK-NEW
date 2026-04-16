@@ -4,9 +4,21 @@
     <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
       <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="onLoad">
         <div class="order-list">
-          <div v-for="order in orderList" :key="order.id" class="order-card" @click="goToPost(order.postId)">
+          <div
+            v-for="order in orderList"
+            :key="order.id"
+            class="order-card"
+            @click="goToPost(order)"
+          >
             <div class="order-header">
-              <span class="post-title">{{ order.post?.title || '帮我看看' }}</span>
+              <div class="order-left">
+                <span
+                  v-if="order.dotColor"
+                  class="status-dot"
+                  :class="`dot-${order.dotColor}`"
+                ></span>
+                <span class="post-title">{{ order.post?.title || '帮我看看' }}</span>
+              </div>
               <van-tag :type="statusType(order.status)">{{ statusText(order.status) }}</van-tag>
             </div>
             <div class="order-info">
@@ -25,7 +37,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { getMyOrders } from '@/api/order'
+import { getMyOrders, viewOrder } from '@/api/order'
 
 const router = useRouter()
 const orderList = ref([])
@@ -50,7 +62,7 @@ const loadOrders = async () => {
   loading.value = true
   try {
     const res = await getMyOrders()
-    orderList.value = Array.isArray(res) ? res : (res.orders || [])
+    orderList.value = res?.list || (Array.isArray(res) ? res : [])
     finished.value = true
   } catch (error) {
     showToast('加载失败')
@@ -61,7 +73,21 @@ const loadOrders = async () => {
 
 const onRefresh = () => { refreshing.value = true; loadOrders().then(() => refreshing.value = false) }
 const onLoad = () => {}
-const goToPost = (postId) => router.push(`/post/${postId}`)
+
+const goToPost = async (order) => {
+  // 如果是已选中且未查看的订单，先标记为已查看
+  if (order.status === 'selected' && order.dotColor === 'green') {
+    try {
+      await viewOrder(order.id)
+      // 更新本地状态为灰点（无需重新加载列表）
+      order.dotColor = 'gray'
+    } catch {
+      // 静默失败
+    }
+  }
+  router.push({ path: `/post/${order.postId}`, query: { from: 'my-orders' } })
+}
+
 const formatTime = (t) => new Date(t).toLocaleDateString()
 const onClickLeft = () => router.back()
 </script>
@@ -71,7 +97,19 @@ const onClickLeft = () => router.back()
 .order-list { padding: 12px; }
 .order-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
 .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.post-title { font-size: 16px; font-weight: 500; color: #333; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 8px; }
+.order-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.post-title { font-size: 16px; font-weight: 500; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .order-info { display: flex; justify-content: space-between; font-size: 13px; color: #999; }
 .reward { color: #ff6b6b; }
+
+/* 状态点 */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-blue { background: #1989fa; }
+.dot-green { background: #07c160; }
+.dot-gray { background: #c8c9cc; }
 </style>

@@ -20,6 +20,7 @@
           width="40"
           height="40"
           :src="post.user?.avatarUrl || 'https://img.yzcdn.cn/vant/cat.jpeg'"
+          @error="onAvatarError($event, 'post')"
         />
         <div class="user-meta">
           <div class="nickname">{{ post.user?.nickname || '匿名用户' }}</div>
@@ -58,8 +59,8 @@
         </div>
       </div>
       
-      <!-- 接单列表 -->
-      <div v-if="orders.length > 0" class="orders-section">
+      <!-- 接单列表（非发单人视角，只显示接单人头像和昵称，隐藏提交内容） -->
+      <div v-if="!isMyPost && orders.length > 0" class="orders-section">
         <h3>接单列表</h3>
         <div class="order-list">
           <div
@@ -73,23 +74,81 @@
                 width="32"
                 height="32"
                 :src="order.user?.avatarUrl || 'https://img.yzcdn.cn/vant/cat.jpeg'"
+                @error="onAvatarError($event, 'order')"
               />
               <span class="order-nickname">{{ order.user?.nickname }}</span>
               <van-tag v-if="order.status === 'selected'" type="success">已选中</van-tag>
+              <van-tag v-else-if="order.status === 'submitted'" type="primary">已提交</van-tag>
+              <van-tag v-else type="default">已接单</van-tag>
             </div>
-            <div v-if="order.description" class="order-desc">
-              {{ order.description }}
+          </div>
+        </div>
+      </div>
+      
+      <!-- 发单人视角：提交列表 + 确认选中 -->
+      <div v-if="isMyPost && (post.status === 'active' || post.status === 'completed')" class="submissions-section">
+        <h3>提交列表 ({{ submissions.length }})</h3>
+        <div v-if="submissions.length === 0 && orders.length > 0" class="no-submissions">
+          <van-empty description="暂无提交，请等待接单人完成任务" image="search" />
+        </div>
+        <div v-else-if="submissions.length === 0" class="no-submissions">
+          <van-empty description="暂无人接单" image="search" />
+        </div>
+        <div v-else class="submission-list">
+          <div
+            v-for="item in submissions"
+            :key="item.id"
+            class="submission-item"
+          >
+            <div class="submission-header">
+              <div class="submission-user">
+                <van-image
+                  round
+                  width="32"
+                  height="32"
+                  :src="item.user?.avatarUrl || 'https://img.yzcdn.cn/vant/cat.jpeg'"
+                  @error="onAvatarError($event, 'submission')"
+                />
+                <span class="submission-nickname">{{ item.user?.nickname }}</span>
+                <van-tag v-if="item.user?.doerCredit" plain size="medium">
+                  信用 {{ item.user.doerCredit }}
+                </van-tag>
+                <van-tag v-if="item.status === 'selected'" type="success" size="medium">已选中</van-tag>
+              </div>
+              <van-button
+                v-if="item.status !== 'selected'"
+                size="small"
+                type="primary"
+                @click="confirmSelect(item.id)"
+                :loading="confirmingId === item.id"
+              >
+                确认选中
+              </van-button>
+              <van-button
+                v-else
+                size="small"
+                type="success"
+                disabled
+              >
+                已选中
+              </van-button>
             </div>
-            <div v-if="order.images" class="order-images">
+            <div v-if="item.description" class="submission-desc">
+              {{ item.description }}
+            </div>
+            <div v-if="item.images" class="submission-images">
               <van-image
-                v-for="(img, idx) in JSON.parse(order.images)"
+                v-for="(img, idx) in parseImages(item.images)"
                 :key="idx"
                 width="80"
                 height="80"
                 :src="img"
                 fit="cover"
-                @click="previewImage(img, JSON.parse(order.images))"
+                @click="previewImage(img, parseImages(item.images))"
               />
+            </div>
+            <div class="submission-time">
+              {{ formatTime(item.submittedAt) }} 提交
             </div>
           </div>
         </div>
@@ -98,17 +157,29 @@
     
     <!-- 底部操作栏 -->
     <div class="bottom-actions">
+      <!-- 发单人视角 -->
       <template v-if="isMyPost">
         <van-button
           v-if="post?.status === 'active'"
           block
           type="danger"
+          plain
           @click="cancelPost"
         >
           取消帖子
         </van-button>
+        <van-button
+          v-else-if="post?.status === 'completed'"
+          block
+          type="success"
+          disabled
+        >
+          任务已完成
+        </van-button>
       </template>
+      <!-- 接单人视角 -->
       <template v-else>
+        <!-- 未接单 -->
         <van-button
           v-if="post?.status === 'active' && !hasOrdered"
           block
@@ -117,13 +188,50 @@
         >
           立即接单
         </van-button>
+        <!-- 已接单，未提交 → 去提交 -->
         <van-button
-          v-else-if="hasOrdered"
+          v-else-if="myOrder && myOrder.status === 'accepted'"
           block
-          type="success"
+          type="primary"
           @click="submitTask"
         >
-          提交任务
+          去提交任务
+        </van-button>
+        <!-- 已提交，等待确认 -->
+        <van-button
+          v-else-if="myOrder && myOrder.status === 'submitted'"
+          block
+          type="warning"
+          disabled
+        >
+          等待发单人确认
+        </van-button>
+        <!-- 已选中 -->
+        <van-button
+          v-else-if="myOrder && myOrder.status === 'selected'"
+          block
+          type="success"
+          disabled
+        >
+          已被选中，积分已到账
+        </van-button>
+        <!-- 已被拒绝 -->
+        <van-button
+          v-else-if="myOrder && myOrder.status === 'rejected'"
+          block
+          type="default"
+          disabled
+        >
+          未被选中
+        </van-button>
+        <!-- 帖子已结束 -->
+        <van-button
+          v-else-if="post?.status !== 'active'"
+          block
+          type="default"
+          disabled
+        >
+          帖子已结束
         </van-button>
       </template>
     </div>
@@ -137,8 +245,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showSuccessToast, showFailToast, showConfirmDialog, showImagePreview } from 'vant'
 import { useAuthStore } from '@/stores/auth'
-import { getPostDetail, cancelPost as apiCancelPost } from '@/api/post'
-import { acceptOrder as apiAcceptOrder } from '@/api/order'
+import { getPostDetail, cancelPost as apiCancelPost, viewSubmissions } from '@/api/post'
+import { acceptOrder as apiAcceptOrder, confirmOrder, getSubmissions } from '@/api/order'
 
 const route = useRoute()
 const router = useRouter()
@@ -146,8 +254,9 @@ const authStore = useAuthStore()
 
 const post = ref(null)
 const orders = ref([])
+const submissions = ref([])
 const loading = ref(false)
-const hasOrdered = ref(false)
+const confirmingId = ref(null)
 
 const postId = route.params.id
 
@@ -172,6 +281,17 @@ const isMyPost = computed(() => {
   return post.value?.userId === authStore.userInfo?.id
 })
 
+// 是否已接单
+const hasOrdered = computed(() => {
+  return !!myOrder.value
+})
+
+// 当前用户在该帖子的订单
+const myOrder = computed(() => {
+  if (!authStore.isLoggedIn || !orders.value.length) return null
+  return orders.value.find(o => o.userId === authStore.userInfo?.id) || null
+})
+
 onMounted(() => {
   loadPostDetail()
 })
@@ -183,18 +303,30 @@ const loadPostDetail = async () => {
   try {
     const res = await getPostDetail(postId)
     post.value = res
-    orders.value = []
+    // Bug1修复：从API返回的post.orders赋值，不再硬编码空数组
+    orders.value = res.orders || []
     
-    // 检查是否已接单
-    if (authStore.isLoggedIn) {
-      hasOrdered.value = orders.value.some(
-        order => order.userId === authStore.userInfo?.id
-      )
+    // 如果是发单人，加载提交列表
+    if (isMyPost.value && (post.value.status === 'active' || post.value.status === 'completed')) {
+      await loadSubmissions()
     }
   } catch (error) {
     showToast('加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载提交列表（发单人视角）
+const loadSubmissions = async () => {
+  try {
+    const res = await getSubmissions(postId)
+    submissions.value = res || []
+    // 标记提交列表已读（静默，不阻塞）
+    viewSubmissions(postId).catch(() => {})
+  } catch (error) {
+    // 非发单人会403，忽略
+    submissions.value = []
   }
 }
 
@@ -214,15 +346,59 @@ const acceptOrder = async () => {
   try {
     await apiAcceptOrder(postId)
     showSuccessToast('接单成功')
-    loadPostDetail()
+    // 刷新帖子详情以更新订单状态
+    await loadPostDetail()
+    
+    // 接单成功后弹窗引导提交
+    showConfirmDialog({
+      title: '接单成功',
+      message: '是否现在就去提交任务？',
+      confirmButtonText: '去提交',
+      cancelButtonText: '稍后再说'
+    }).then(() => {
+      // 用户选择提交，跳转提交页面并携带来源参数
+      router.push({
+        path: `/order/submit/${postId}`,
+        query: route.query.from ? { from: route.query.from } : {}
+      })
+    }).catch(() => {
+      // 用户取消，显示提示
+      showToast('您可以稍后在"我的接单"中执行提交操作')
+    })
   } catch (error) {
     showFailToast(error.message || '接单失败')
   }
 }
 
-// 提交任务
+// 提交任务（跳转到提交页，携带来源参数）
 const submitTask = () => {
-  router.push(`/order/submit/${postId}`)
+  if (!myOrder.value) return
+  router.push({
+    path: `/order/submit/${postId}`,
+    query: route.query.from ? { from: route.query.from } : {}
+  })
+}
+
+// 确认选中（发单人操作）
+const confirmSelect = async (orderId) => {
+  try {
+    await showConfirmDialog({
+      title: '确认选中',
+      message: '选中后将自动结算积分给该接单人，其他已提交的接单将被驳回并按比例发放补偿积分。确认选中吗？'
+    })
+    
+    confirmingId.value = orderId
+    await confirmOrder(orderId)
+    showSuccessToast('确认成功，积分已结算')
+    // 刷新页面
+    loadPostDetail()
+  } catch (error) {
+    if (error !== 'cancel' && error?.message !== 'cancel') {
+      showFailToast(error.message || '操作失败')
+    }
+  } finally {
+    confirmingId.value = null
+  }
 }
 
 // 取消帖子
@@ -241,6 +417,16 @@ const cancelPost = () => {
   })
 }
 
+// 解析图片JSON字符串
+const parseImages = (images) => {
+  if (!images) return []
+  try {
+    return JSON.parse(images)
+  } catch {
+    return []
+  }
+}
+
 // 预览图片
 const previewImage = (current, images) => {
   showImagePreview({
@@ -251,12 +437,14 @@ const previewImage = (current, images) => {
 
 // 格式化时间
 const formatTime = (time) => {
+  if (!time) return ''
   const date = new Date(time)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 // 格式化截止时间
 const formatDeadline = (deadline) => {
+  if (!deadline) return ''
   const date = new Date(deadline)
   const now = new Date()
   const diff = date - now
@@ -271,7 +459,21 @@ const formatDeadline = (deadline) => {
   }
   
   const hours = Math.floor(diff / 3600000)
-  return `${hours}小时后`
+  if (hours > 0) {
+    return `${hours}小时后`
+  }
+  
+  const minutes = Math.floor(diff / 60000)
+  return `${minutes}分钟后`
+}
+
+// 头像加载失败时替换为默认头像
+const defaultAvatar = 'https://img.yzcdn.cn/vant/cat.jpeg'
+const onAvatarError = (e, type) => {
+  const imgEl = e.target
+  if (imgEl.tagName === 'IMG') {
+    imgEl.src = defaultAvatar
+  }
 }
 
 const onClickLeft = () => {
@@ -380,13 +582,15 @@ const onClickLeft = () => {
   font-size: 18px;
 }
 
+/* 接单列表（非发单人） */
 .orders-section {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid #f0f0f0;
 }
 
-.orders-section h3 {
+.orders-section h3,
+.submissions-section h3 {
   font-size: 16px;
   margin-bottom: 12px;
 }
@@ -403,32 +607,75 @@ const onClickLeft = () => {
   border-radius: 8px;
 }
 
-.order-user {
+.order-user,
+.submission-header {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
 }
 
-.order-nickname {
+.order-nickname,
+.submission-nickname {
   font-size: 14px;
   color: #333;
   flex: 1;
 }
 
-.order-desc {
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 8px;
-  line-height: 1.5;
+/* 提交列表（发单人） */
+.submissions-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
 }
 
-.order-images {
+.no-submissions {
+  padding: 16px 0;
+}
+
+.submission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.submission-item {
+  padding: 12px;
+  background: #f8f8f8;
+  border-radius: 8px;
+}
+
+.submission-header {
+  margin-bottom: 8px;
+}
+
+.submission-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.submission-desc {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.submission-images {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-bottom: 8px;
 }
 
+.submission-time {
+  font-size: 12px;
+  color: #999;
+}
+
+/* 底部操作栏 */
 .bottom-actions {
   position: fixed;
   bottom: 0;

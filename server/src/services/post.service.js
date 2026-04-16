@@ -323,7 +323,7 @@ const deletePost = async (postId, userId) => {
 };
 
 /**
- * 获取我的帖子
+ * 获取我的帖子（含未读提交数）
  */
 const getMyPosts = async (userId, { page = 1, pageSize = 20, status } = {}) => {
   const where = { userId };
@@ -344,7 +344,84 @@ const getMyPosts = async (userId, { page = 1, pageSize = 20, status } = {}) => {
     prisma.post.count({ where }),
   ]);
 
-  return { list, total, page, pageSize };
+  // 批量查询每个帖子的未读提交数
+  // 未读 = status in (submitted, selected) 且 createdAt > lastViewedSubmissionsAt
+  const postIds = list.map(p => p.id);
+  let unreadMap = {};
+  if (postIds.length > 0) {
+    // 查询所有帖子的 lastViewedSubmissionsAt
+    const postViewTimes = await prisma.post.findMany({
+      where: { id: { in: postIds } },
+      select: { id: true, lastViewedSubmissionsAt: true },
+    });
+    const viewTimeMap = {};
+    for (const pv of postViewTimes) {
+      viewTimeMap[pv.id] = pv.lastViewedSubmissionsAt;
+    }
+
+    // 查询所有已提交/已选中的订单数量，以及每个帖子的未读数
+    const submittedCounts = await prisma.order.groupBy({
+      by: ['postId'],
+      where: {
+        postId: { in: postIds },
+        status: { in: ['submitted', 'selected'] },
+      },
+      _count: true,
+    });
+
+    const countMap = {};
+    for (const sc of submittedCounts) {
+      countMap[sc.postId] = sc._count;
+    }
+
+    // 查询每个帖子在 lastViewedSubmissionsAt 之后的提交数
+    for (const p of list) {
+      const viewTime = viewTimeMap[p.id];
+      if (!viewTime) {
+        // 从未查看过，所有提交都是未读
+        unreadMap[p.id] = countMap[p.id] || 0;
+      } else {
+        // 只统计查看时间之后的提交
+        const unreadCount = await prisma.order.count({
+          where: {
+            postId: p.id,
+            status: { in: ['submitted', 'selected'] },
+            submittedAt: { gt: viewTime },
+          },
+        });
+        unreadMap[p.id] = unreadCount;
+      }
+    }
+  }
+
+  // 计算总未读数（用于入口 badge）
+  let totalUnread = 0;
+  for (const pid of postIds) {
+    totalUnread += unreadMap[pid] || 0;
+  }
+
+  const listWithUnread = list.map(p => ({
+    ...p,
+    unreadSubmissions: unreadMap[p.id] || 0,
+  }));
+
+  return { list: listWithUnread, total, page, pageSize, totalUnread };
+};
+
+/**
+ * 标记帖子的提交列表已读
+ */
+const viewSubmissions = async (userId, postId) => {
+  const post = await prisma.post.findUnique({ where: { id: postId } });
+  if (!post) throw new ApiError(404, '帖子不存在');
+  if (post.userId !== userId) throw new ApiError(403, '无权操作');
+
+  await prisma.post.update({
+    where: { id: postId },
+    data: { lastViewedSubmissionsAt: new Date() },
+  });
+
+  return { success: true };
 };
 
 // ========== 内部辅助函数 ==========
@@ -385,6 +462,32 @@ function formatPostListItem(post) {
   };
 }
 
+/**
+ * 获取帖子未读提交 badge 数
+ */
+const getPostBadges = async (userId) => {
+  // 查找用户所有 active 状态的帖子
+  const myPosts = await prisma.post.findMany({
+    where: { userId, status: 'active' },
+    select: { id: true, lastViewedSubmissionsAt: true },
+  });
+
+  let totalUnread = 0;
+  for (const post of myPosts) {
+    const where = {
+      postId: post.id,
+      status: { in: ['submitted', 'selected'] },
+    };
+    if (post.lastViewedSubmissionsAt) {
+      where.submittedAt = { gt: post.lastViewedSubmissionsAt };
+    }
+    const count = await prisma.order.count({ where });
+    totalUnread += count;
+  }
+
+  return { unreadSubmissions: totalUnread };
+};
+
 module.exports = {
   getPosts,
   getPostDetail,
@@ -392,4 +495,6 @@ module.exports = {
   updatePost,
   deletePost,
   getMyPosts,
+  viewSubmissions,
+  getPostBadges,
 };

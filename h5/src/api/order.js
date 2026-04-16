@@ -19,3 +19,18 @@ export const confirmOrder = (orderId, data) => {
 export const getMyOrders = () => {
   return request.get('/orders/my-orders')
 }
+
+// 获取帖子的提交列表（发单人）
+export const getSubmissions = (postId) => {
+  return request.get(`/orders/submissions/${postId}`)
+}
+
+// 标记订单已查看
+export const viewOrder = (orderId) => {
+  return request.post(`/orders/${orderId}/view`)
+}
+
+// 获取订单 badge 信息
+export const getOrderBadges = () => {
+  return request.get('/orders/badges')
+}

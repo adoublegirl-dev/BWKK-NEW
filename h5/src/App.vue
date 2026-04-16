@@ -5,10 +5,33 @@
     </keep-alive>
   </router-view>
   <TabBar v-if="showTabBar" />
+
+  <!-- 首次登录用户引导弹窗 -->
+  <van-dialog
+    v-model:show="showGuide"
+    title="欢迎来到帮我看看"
+    confirm-button-text="我知道了"
+    :confirm-button-disabled="guideCountdown > 0"
+    @confirm="onGuideClose"
+  >
+    <div class="guide-content">
+      <p>这是一个互助接单平台，当你想去某个地方，但是不知道现在这里人多不多或者店开没开门，可以通过这里发布帖子，热心的网友会帮你看一看。</p>
+    </div>
+    <template #footer>
+      <van-button
+        block
+        type="primary"
+        :disabled="guideCountdown > 0"
+        @click="onGuideClose"
+      >
+        我知道了{{ guideCountdown > 0 ? ` (${guideCountdown}s)` : '' }}
+      </van-button>
+    </template>
+  </van-dialog>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from './components/TabBar.vue'
 import { useAuthStore } from './stores/auth'
@@ -25,9 +48,54 @@ const showTabBar = computed(() => {
   return !noTabBarRoutes.some(path => route.path.startsWith(path))
 })
 
+// 首次登录用户引导弹窗
+const showGuide = ref(false)
+const guideCountdown = ref(5)
+let guideTimer = null
+
+const checkGuide = () => {
+  if (!authStore.isLoggedIn || !authStore.userInfo) return
+  const guideKey = `guide_shown_${authStore.userInfo.id}`
+  if (!localStorage.getItem(guideKey)) {
+    showGuide.value = true
+    guideCountdown.value = 5
+    guideTimer = setInterval(() => {
+      guideCountdown.value--
+      if (guideCountdown.value <= 0) {
+        clearInterval(guideTimer)
+        guideTimer = null
+      }
+    }, 1000)
+  }
+}
+
+const onGuideClose = () => {
+  if (authStore.userInfo) {
+    const guideKey = `guide_shown_${authStore.userInfo.id}`
+    localStorage.setItem(guideKey, '1')
+  }
+  showGuide.value = false
+  if (guideTimer) {
+    clearInterval(guideTimer)
+    guideTimer = null
+  }
+}
+
+// 监听登录状态变化，登录成功后检查是否需要显示引导
+watch(() => authStore.isLoggedIn, (newVal) => {
+  if (newVal && authStore.userInfo) {
+    // 延迟500ms确保userInfo已加载
+    setTimeout(() => checkGuide(), 500)
+  }
+})
+
 // 初始化认证状态
 onMounted(() => {
   authStore.init()
+  // 已登录用户也需要检查引导（刷新页面场景）
+  if (authStore.isLoggedIn) {
+    setTimeout(() => checkGuide(), 800)
+  }
 })
 </script>
 
@@ -58,5 +126,13 @@ body {
 .page-enter-from,
 .page-leave-to {
   opacity: 0;
+}
+
+/* 用户引导弹窗 */
+.guide-content {
+  padding: 16px 20px 8px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #666;
 }
 </style>
