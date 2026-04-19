@@ -376,12 +376,26 @@ const viewOrder = async (userId, orderId) => {
  * 获取订单相关 badge 信息（红点/未读数）
  */
 const getOrderBadges = async (userId) => {
-  // 是否有进行中的订单（红点）
+  // 有以下任一状态时显示红点：
+  // 1. accepted - 进行中（刚接单，未提交）
+  // 2. submitted - 已提交（等待发单人确认）
+  // 3. selected 且未查看（新被选中，积分刚到账）
   const activeCount = await prisma.order.count({
-    where: { userId, status: 'submitted' },
+    where: {
+      userId,
+      status: { in: ['accepted', 'submitted'] },
+    },
   });
 
-  const hasRedDot = activeCount > 0;
+  const newSelectedCount = await prisma.order.count({
+    where: {
+      userId,
+      status: 'selected',
+      lastViewedAt: null,
+    },
+  });
+
+  const hasRedDot = (activeCount + newSelectedCount) > 0;
 
   return { hasRedDot };
 };

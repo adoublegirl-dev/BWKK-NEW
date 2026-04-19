@@ -31,8 +31,11 @@ request.interceptors.response.use(
   (response) => {
     const res = response.data
     
-    // 业务成功
-    if (res.code === 0 || res.code === 200) {
+    // 版本标识：如果浏览器显示 "v2" 说明加载了修复后的版本
+    console.log('[REQUEST] v2 - response code:', res.code, 'message:', res.message, 'url:', response.config.url)
+    
+    // 业务成功（接受 0 和所有 2xx 状态码）
+    if (res.code === 0 || (res.code >= 200 && res.code < 300)) {
       return res.data
     }
     

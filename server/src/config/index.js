@@ -55,4 +55,10 @@ module.exports = {
     jwtSecret: process.env.ADMIN_JWT_SECRET,
     jwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '24h',
   },
+
+  // 商家 JWT（独立于用户和管理员）
+  merchant: {
+    jwtSecret: process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET + '-merchant',
+    jwtExpiresIn: process.env.MERCHANT_JWT_EXPIRES_IN || '24h',
+  },
 };

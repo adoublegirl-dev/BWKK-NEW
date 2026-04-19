@@ -35,17 +35,27 @@ model User {
   frozenPoints  Int      @default(0)         // 冻结中的积分
   // 可用积分 = totalPoints - frozenPoints
 
+  // 商家角色
+  role           String  @default("normal")  // normal | merchant
+  merchantName   String? // 商家名称（角色为merchant时必填）
+  merchantDesc   String? // 商家描述
+  merchantContact String? // 商家联系方式
+
   // 关联
   posts         Post[]
   orders        Order[]
   transactions  Transaction[]
   creditRecords CreditRecord[]
+  voucherBatches VoucherBatch[]
+  voucherCodes  VoucherCode[]
+  exchangeRecords ExchangeRecord[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([city])
   @@index([email])
+  @@index([role])
   @@map("users")
 }
 
@@ -66,9 +76,18 @@ model Post {
   orderCount              Int      @default(0)        // 接单人数
   lastViewedSubmissionsAt DateTime?                    // 发单人上次查看提交列表的时间
 
+  // 商家帖子字段
+  postType        String   @default("normal") // normal | merchant
+  selectionMode   String?  // manual | random | first_n（商家帖子专用）
+  selectionCount  Int      @default(1)        // 选中数量
+  rewardType      String   @default("points") // points | voucher
+  voucherBatchId  String?  @unique // 代金券批次关联
+  autoSelectedAt  DateTime? // 自动选中执行时间
+
   // 关联
   user            User     @relation(fields: [userId], references: [id])
   orders          Order[]
+  voucherBatch    VoucherBatch? @relation(fields: [voucherBatchId], references: [id])
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -76,6 +95,7 @@ model Post {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([postType])
   @@map("posts")
 }
 
@@ -151,19 +171,33 @@ model CreditRecord {
   @@map("credit_records")
 }
 
-// ========== 兑换商城商品表（预留，MVP不使用） ==========
+// ========== 兑换商城商品表 ==========
 model ShopProduct {
   id              String   @id @default(cuid())
   name            String
   description     String?
-  imageUrl        String?
-  pointsPrice     Int                            // 所需积分
+  images          String?  // JSON数组，多图URL
+  categoryId      String?  // 分类ID
+  pointsPrice     Int      // 所需积分
   stock           Int      @default(0)           // 库存
+  exchangedCount  Int      @default(0)           // 已兑换数量
+  remainingCount  Int      @default(0)           // 剩余数量
   status          String   @default("draft")     // draft | active | soldout | disabled
+  validFrom       DateTime? // 可兑换开始日期
+  validUntil      DateTime? // 可兑换结束日期
+  province        String?  // 省
+  city            String?  // 市
+  district        String?  // 区
+
+  // 关联
+  category        ProductCategory? @relation(fields: [categoryId], references: [id])
+  exchangeRecords ExchangeRecord[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  @@index([categoryId])
+  @@index([status])
   @@map("shop_products")
 }
 
@@ -178,6 +212,7 @@ model AdminUser {
   updatedAt     DateTime @updatedAt
 
   logs          AdminLog[]
+  pointsAdjustmentLogs PointsAdjustmentLog[]
 
   @@map("admin_users")
 }
@@ -215,4 +250,140 @@ model VerificationCode {
   @@index([email, code])
   @@index([expiresAt])
   @@map("verification_codes")
+}
+
+// ========== 商品分类表（3级树形结构） ==========
+model ProductCategory {
+  id          String   @id @default(cuid())
+  name        String   // 分类名称
+  parentId    String?  // 父分类ID，null为顶级
+  level       Int      @default(1)        // 1/2/3级
+  sortOrder   Int      @default(0)        // 排序序号
+  status      String   @default("active") // active | disabled
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 自关联
+  parent      ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    ProductCategory[] @relation("CategoryTree")
+
+  // 关联商品
+  products    ShopProduct[]
+
+  @@index([parentId])
+  @@index([level])
+  @@index([status])
+  @@map("product_categories")
+}
+
+// ========== 代金券批次表 ==========
+model VoucherBatch {
+  id                String   @id @default(cuid())
+  merchantId        String   // 商家用户ID
+  name              String   // 批次名称
+  description       String?  // 批次描述
+  faceValue         Int      // 面值（积分，10积分=1代金券）
+  pointsPerVoucher  Int      // 每张代金券积分成本
+  totalQuantity     Int      // 总数量
+  distributedQty    Int      @default(0) // 已分发数量
+  remainingQty      Int      // 剩余可分数量
+  validDays         Int      // 有效天数（从分发时起算）
+  status            String   @default("active") // active | disabled | expired
+  postId            String?  // 关联帖子ID（通过Post的voucherBatchId反向关联）
+
+  // 关联
+  merchant          User     @relation(fields: [merchantId], references: [id])
+  codes             VoucherCode[]
+  post              Post?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([merchantId])
+  @@index([status])
+  @@map("voucher_batches")
+}
+
+// ========== 代金券实例表 ==========
+model VoucherCode {
+  id                    String   @id @default(cuid())
+  batchId               String   // 所属批次ID
+  userId                String?  // 持有用户ID（未分发时为null）
+  redeemCode            String   @unique // 16位加密随机兑换码
+  status                String   @default("unused") // unused | used | expired
+  faceValue             Int      // 面值
+  validFrom             DateTime? // 有效期开始
+  validUntil            DateTime? // 有效期结束
+  sourceType            String   @default("merchant_post") // merchant_post | shop_exchange
+  redeemedAt            DateTime? // 核销时间
+  redeemedByMerchantId  String?  // 核销商家ID
+
+  // 关联
+  batch                 VoucherBatch @relation(fields: [batchId], references: [id])
+  user                  User?   @relation(fields: [userId], references: [id])
+  exchangeRecord        ExchangeRecord?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([batchId])
+  @@index([userId])
+  @@index([status])
+  @@index([redeemedByMerchantId])
+  @@map("voucher_codes")
+}
+
+// ========== 统一兑换记录表 ==========
+model ExchangeRecord {
+  id              String   @id @default(cuid())
+  userId          String   // 兑换用户ID
+  type            String   // shop_product | voucher
+  pointsCost      Int      // 消耗积分
+  productId       String?  // 商品ID（type=shop_product时有值）
+  productName     String?  // 商品名称（冗余）
+  productImage    String?  // 商品图片（冗余）
+  voucherCodeId   String?  @unique // 代金券实例ID（type=voucher时有值）
+  redeemCode      String?  // 兑换码（冗余）
+  faceValue       Int?     // 代金券面值
+  status          String   @default("valid") // valid | used | expired | refunded
+  validFrom       DateTime? // 有效期开始
+  validUntil      DateTime? // 有效期结束
+  redeemedAt      DateTime? // 核销时间
+  redeemedBy      String?  // 核销人（商家ID）
+
+  // 关联
+  user            User        @relation(fields: [userId], references: [id])
+  product         ShopProduct? @relation(fields: [productId], references: [id])
+  voucherCode     VoucherCode? @relation(fields: [voucherCodeId], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("exchange_records")
+}
+
+// ========== 积分调整日志表 ==========
+model PointsAdjustmentLog {
+  id              String   @id @default(cuid())
+  adminId         String   // 操作管理员ID
+  targetUserId    String?  // 目标用户ID（全量调整时为null）
+  targetType      String   @default("single") // single | all
+  amount          Int      // 调整数量（正数为增加，负数为减少）
+  reason          String   // 调整原因
+  beforeBalance   Int?     // 调整前余额（全量调整时为null）
+  afterBalance    Int?     // 调整后余额（全量调整时为null）
+
+  // 关联
+  admin           AdminUser @relation(fields: [adminId], references: [id])
+
+  createdAt       DateTime @default(now())
+
+  @@index([adminId])
+  @@index([targetUserId])
+  @@index([createdAt])
+  @@map("points_adjustment_logs")
 }

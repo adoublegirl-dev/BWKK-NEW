@@ -27,3 +27,7 @@ export { default as user } from './user';
 // 积分/支付相关
 export * from './payment';
 export { default as payment } from './payment';
+
+// 积分商城相关
+export * from './shop';
+export { default as shop } from './shop';

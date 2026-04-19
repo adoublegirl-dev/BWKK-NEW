@@ -4,7 +4,7 @@
       <component :is="Component" />
     </keep-alive>
   </router-view>
-  <TabBar v-if="showTabBar" />
+  <TabBar :order-red-dot="orderRedDot" v-if="showTabBar" />
 
   <!-- 首次登录用户引导弹窗 -->
   <van-dialog
@@ -35,6 +35,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from './components/TabBar.vue'
 import { useAuthStore } from './stores/auth'
+import { getOrderBadges } from './api/order'
+import { getPostBadges } from './api/post'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -47,6 +49,29 @@ const showTabBar = computed(() => {
   const noTabBarRoutes = ['/login', '/post/create', '/order/submit', '/post/']
   return !noTabBarRoutes.some(path => route.path.startsWith(path))
 })
+
+// 订单红点（TabBar "我的"入口提示）
+const orderRedDot = ref(false)
+
+const refreshOrderBadge = async () => {
+  if (!authStore.isLoggedIn) {
+    orderRedDot.value = false
+    return
+  }
+  try {
+    const [postRes, orderRes] = await Promise.all([
+      getPostBadges(),
+      getOrderBadges()
+    ])
+    // 发单人侧：有未读提交/接单时显示红点
+    const hasPostBadge = (postRes?.unreadSubmissions || 0) > 0
+    // 接单人侧：有进行中/新完成订单时显示红点
+    const hasOrderBadge = !!orderRes?.hasRedDot
+    orderRedDot.value = hasPostBadge || hasOrderBadge
+  } catch {
+    orderRedDot.value = false
+  }
+}
 
 // 首次登录用户引导弹窗
 const showGuide = ref(false)
@@ -81,11 +106,20 @@ const onGuideClose = () => {
   }
 }
 
-// 监听登录状态变化，登录成功后检查是否需要显示引导
+// 监听登录状态变化，登录成功后检查是否需要显示引导 + 刷新红点
 watch(() => authStore.isLoggedIn, (newVal) => {
   if (newVal && authStore.userInfo) {
-    // 延迟500ms确保userInfo已加载
     setTimeout(() => checkGuide(), 500)
+    refreshOrderBadge()
+  } else {
+    orderRedDot.value = false
+  }
+})
+
+// 路由变化时刷新红点（在有TabBar的页面才刷新）
+watch(() => route.path, () => {
+  if (showTabBar.value) {
+    refreshOrderBadge()
   }
 })
 
@@ -95,6 +129,7 @@ onMounted(() => {
   // 已登录用户也需要检查引导（刷新页面场景）
   if (authStore.isLoggedIn) {
     setTimeout(() => checkGuide(), 800)
+    refreshOrderBadge()
   }
 })
 </script>

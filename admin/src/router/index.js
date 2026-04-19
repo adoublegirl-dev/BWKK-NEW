@@ -72,6 +72,37 @@ const routes = [
         component: () => import('../views/log/LogList.vue'),
         meta: { title: '操作日志', icon: 'Notebook' },
       },
+      // ========== 积分商城管理 ==========
+      {
+        path: 'categories',
+        name: 'CategoryList',
+        component: () => import('../views/category/CategoryList.vue'),
+        meta: { title: '分类管理', icon: 'Menu' },
+      },
+      {
+        path: 'products',
+        name: 'ProductList',
+        component: () => import('../views/product/ProductList.vue'),
+        meta: { title: '商品管理', icon: 'Goods' },
+      },
+      {
+        path: 'vouchers',
+        name: 'VoucherList',
+        component: () => import('../views/voucher/VoucherList.vue'),
+        meta: { title: '代金券管理', icon: 'Ticket' },
+      },
+      {
+        path: 'points-adjust',
+        name: 'PointsAdjust',
+        component: () => import('../views/points/PointsAdjust.vue'),
+        meta: { title: '积分调整', icon: 'Coin' },
+      },
+      {
+        path: 'merchants',
+        name: 'MerchantList',
+        component: () => import('../views/merchant/MerchantList.vue'),
+        meta: { title: '商家管理', icon: 'Shop' },
+      },
     ],
   },
 ]

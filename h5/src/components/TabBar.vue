@@ -1,8 +1,10 @@
 <template>
-  <van-tabbar v-model="active" route>
-    <van-tabbar-item to="/" icon="home-o">首页</van-tabbar-item>
-    <van-tabbar-item icon="plus" @click="onPublishClick">发布</van-tabbar-item>
-    <van-tabbar-item to="/profile" icon="user-o">我的</van-tabbar-item>
+  <van-tabbar v-model="active">
+    <van-tabbar-item icon="home-o" name="home" @click="onHomeClick">首页</van-tabbar-item>
+    <van-tabbar-item icon="plus" name="publish" @click="onPublishClick">发布</van-tabbar-item>
+    <van-tabbar-item name="profile" :dot="orderRedDot" @click="onProfileClick">
+      我的
+    </van-tabbar-item>
   </van-tabbar>
 </template>
 
@@ -10,7 +12,14 @@
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Dialog } from 'vant'
+import { showConfirmDialog } from 'vant'
+
+const props = defineProps({
+  orderRedDot: {
+    type: Boolean,
+    default: false
+  }
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -29,10 +38,21 @@ watch(() => route.path, (path) => {
   }
 }, { immediate: true })
 
-// 发布按钮点击
+// 首页点击（始终触发，包括重复点击已激活的tab）
+const onHomeClick = () => {
+  if (route.path === '/') {
+    // 已在首页，重置排序并刷新
+    window.dispatchEvent(new CustomEvent('home-refresh'))
+  } else {
+    // 从其他页面回到首页，带上刷新标记
+    router.replace('/?refresh=1&t=' + Date.now())
+  }
+}
+
+// 发布点击
 const onPublishClick = () => {
   if (!authStore.isLoggedIn) {
-    Dialog.confirm({
+    showConfirmDialog({
       title: '提示',
       message: '请先登录后再发布需求',
       confirmButtonText: '去登录',
@@ -40,9 +60,15 @@ const onPublishClick = () => {
     }).then(() => {
       router.push('/login')
     }).catch(() => {})
+    active.value = -1
     return
   }
   router.push('/post/create')
+}
+
+// 我的点击
+const onProfileClick = () => {
+  router.replace('/profile')
 }
 </script>
 

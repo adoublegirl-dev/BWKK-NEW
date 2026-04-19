@@ -6,6 +6,12 @@
         <el-form-item label="搜索">
           <el-input v-model="query.keyword" placeholder="邮箱/昵称/ID" clearable style="width: 200px" @keyup.enter="handleSearch" />
         </el-form-item>
+        <el-form-item label="角色">
+          <el-select v-model="query.role" placeholder="全部" clearable style="width: 120px">
+            <el-option label="个人" value="normal" />
+            <el-option label="商家" value="merchant" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="信用状态">
           <el-select v-model="query.creditStatus" placeholder="全部" clearable style="width: 130px">
             <el-option label="正常" value="normal" />
@@ -63,12 +69,21 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="角色" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.role === 'merchant' ? 'warning' : 'info'" size="small">
+              {{ row.role === 'merchant' ? '商家' : '个人' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="createdAt" label="注册时间" width="160">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="$router.push(`/users/${row.id}`)">详情</el-button>
+            <el-button v-if="row.role !== 'merchant'" type="warning" link @click="handleSetMerchant(row)">设为商家</el-button>
+            <el-button v-else type="danger" link @click="handleCancelMerchant(row)">取消商家</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -89,7 +104,8 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { getUsers } from '../../api/admin'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getUsers, updateUserRole } from '../../api/admin'
 import dayjs from 'dayjs'
 
 const list = ref([])
@@ -101,6 +117,7 @@ const query = reactive({
   pageSize: 20,
   keyword: '',
   creditStatus: '',
+  role: '',
 })
 
 function creditType(score) {
@@ -132,8 +149,37 @@ function handleSearch() {
 function resetQuery() {
   query.keyword = ''
   query.creditStatus = ''
+  query.role = ''
   query.page = 1
   fetchList()
+}
+
+// ========== 角色切换 ==========
+async function handleSetMerchant(row) {
+  try {
+    const { value: merchantName } = await ElMessageBox.prompt('请输入商家名称', '设为商家', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '商家名称不能为空',
+    })
+    await updateUserRole(row.id, { role: 'merchant', merchantName })
+    ElMessage.success('已设为商家')
+    fetchList()
+  } catch (e) {
+    if (e !== 'cancel' && e?.action !== 'cancel') ElMessage.error(e.message || '操作失败')
+  }
+}
+
+async function handleCancelMerchant(row) {
+  try {
+    await ElMessageBox.confirm(`确定取消"${row.nickname || row.id}"的商家身份吗？`, '确认取消商家', { type: 'warning' })
+    await updateUserRole(row.id, { role: 'normal' })
+    ElMessage.success('已取消商家身份')
+    fetchList()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e.message || '操作失败')
+  }
 }
 
 onMounted(fetchList)

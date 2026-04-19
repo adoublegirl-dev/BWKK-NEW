@@ -1,7 +1,10 @@
 <template>
   <div class="post-card" @click="onClick">
     <div class="post-header">
-      <div class="post-title">{{ post.title || '帮我看看' }}</div>
+      <div class="post-title">
+        <van-tag v-if="post.postType === 'merchant'" type="warning" size="medium" style="margin-right:6px;">商家</van-tag>
+        {{ post.title || '帮我看看' }}
+      </div>
       <van-tag :type="statusType" size="medium">{{ statusText }}</van-tag>
     </div>
     

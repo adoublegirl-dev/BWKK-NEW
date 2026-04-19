@@ -88,6 +88,33 @@
         />
       </van-cell-group>
       
+      <!-- 商家专属选项 -->
+      <van-cell-group v-if="isMerchant" inset class="mt-12">
+        <van-cell title="帖子类型" value="商家帖子" />
+        <van-field
+          v-model="selectionModeText"
+          label="选中方式"
+          placeholder="请选择"
+          readonly
+          is-link
+          @click="showSelectionModePicker = true"
+        />
+        <van-field
+          v-model="form.selectionCount"
+          label="选中数量"
+          placeholder="1"
+          type="digit"
+        />
+        <van-field
+          v-model="rewardTypeText"
+          label="奖励类型"
+          placeholder="请选择"
+          readonly
+          is-link
+          @click="showRewardTypePicker = true"
+        />
+      </van-cell-group>
+      
       <div class="submit-btn">
         <van-button round block type="primary" native-type="submit" :loading="submitting">
           发布需求
@@ -105,19 +132,40 @@
         title="选择截止时间"
       />
     </van-popup>
+    
+    <!-- 商家：选中方式选择器 -->
+    <van-popup v-model:show="showSelectionModePicker" position="bottom" round>
+      <van-picker
+        :columns="selectionModeColumns"
+        @confirm="onSelectionModeConfirm"
+        @cancel="showSelectionModePicker = false"
+        show-toolbar
+        title="选择选中方式"
+      />
+    </van-popup>
+    
+    <!-- 商家：奖励类型选择器 -->
+    <van-popup v-model:show="showRewardTypePicker" position="bottom" round>
+      <van-picker
+        :columns="rewardTypeColumns"
+        @confirm="onRewardTypeConfirm"
+        @cancel="showRewardTypePicker = false"
+        show-toolbar
+        title="选择奖励类型"
+      />
+    </van-popup>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { showSuccessToast, showFailToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
 import { createPost } from '@/api/post'
 import LocationPicker from '@/components/LocationPicker.vue'
 
-const router = useRouter()
 const authStore = useAuthStore()
+const isMerchant = computed(() => authStore.userInfo?.role === 'merchant')
 
 const form = ref({
   title: '',
@@ -125,12 +173,32 @@ const form = ref({
   location: null,
   rewardAmount: '',
   compensateRate: '0',
-  deadline: null
+  deadline: null,
+  selectionMode: '',
+  selectionCount: 1,
+  rewardType: 'points',
 })
 
 const submitting = ref(false)
 const showDeadlinePicker = ref(false)
 const deadlineText = ref('')
+
+// 商家专属字段
+const showSelectionModePicker = ref(false)
+const showRewardTypePicker = ref(false)
+const selectionModeText = ref('手动')
+const rewardTypeText = ref('积分')
+
+const selectionModeColumns = [
+  { text: '手动', value: 'manual' },
+  { text: '随机', value: 'random' },
+  { text: '前N名', value: 'first_n' },
+]
+
+const rewardTypeColumns = [
+  { text: '积分', value: 'points' },
+  { text: '代金券', value: 'voucher' },
+]
 
 // 截止时间选项
 const deadlineColumns = [
@@ -168,11 +236,26 @@ const onDeadlineConfirm = ({ selectedOptions }) => {
   showDeadlinePicker.value = false
 }
 
+// 商家：选择选中方式
+const onSelectionModeConfirm = ({ selectedOptions }) => {
+  form.value.selectionMode = selectedOptions[0].value
+  selectionModeText.value = selectedOptions[0].text
+  showSelectionModePicker.value = false
+}
+
+// 商家：选择奖励类型
+const onRewardTypeConfirm = ({ selectedOptions }) => {
+  form.value.rewardType = selectedOptions[0].value
+  rewardTypeText.value = selectedOptions[0].text
+  showRewardTypePicker.value = false
+}
+
 // 提交表单
 const onSubmit = async () => {
   submitting.value = true
   
   try {
+    console.log('[POST-CREATE] 开始提交帖子...')
     const data = {
       title: form.value.title || '帮我看看',
       description: form.value.description,
@@ -185,20 +268,30 @@ const onSubmit = async () => {
       deadline: form.value.deadline
     }
     
-    await createPost(data)
-    showSuccessToast('发布成功')
-    setTimeout(() => {
-      router.replace('/?refresh=1')
-    }, 1000)
-  } catch (error) {
-    showFailToast(error.message || '发布失败')
-  } finally {
+    // 商家帖子附加字段
+    if (isMerchant.value) {
+      data.postType = 'merchant'
+      data.selectionMode = form.value.selectionMode || 'manual'
+      data.selectionCount = parseInt(form.value.selectionCount) || 1
+      data.rewardType = form.value.rewardType || 'points'
+    }
+    
+    const result = await createPost(data)
+    console.log('[POST-CREATE] API返回成功:', result)
     submitting.value = false
+    showSuccessToast('发布成功')
+    console.log('[POST-CREATE] 准备跳转到首页...')
+    // 直接跳转，不使用 setTimeout，不使用 Vue Router
+    window.location.replace('/')
+  } catch (error) {
+    console.error('[POST-CREATE] 提交失败:', error)
+    submitting.value = false
+    showFailToast(error.message || '发布失败')
   }
 }
 
 const onClickLeft = () => {
-  router.back()
+  window.history.back()
 }
 </script>
 

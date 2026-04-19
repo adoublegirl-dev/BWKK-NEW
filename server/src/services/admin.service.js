@@ -166,7 +166,7 @@ async function getDashboard() {
 
 // ========== 用户管理 ==========
 
-async function getUsers({ page = 1, pageSize = 20, keyword = '', creditStatus = '' }) {
+async function getUsers({ page = 1, pageSize = 20, keyword = '', creditStatus = '', role = '' }) {
   const where = {};
 
   if (keyword) {
@@ -179,6 +179,10 @@ async function getUsers({ page = 1, pageSize = 20, keyword = '', creditStatus = 
 
   if (creditStatus) {
     where.creditStatus = creditStatus;
+  }
+
+  if (role) {
+    where.role = role;
   }
 
   const [list, total] = await Promise.all([
@@ -199,6 +203,10 @@ async function getUsers({ page = 1, pageSize = 20, keyword = '', creditStatus = 
         creditStatus: true,
         totalPoints: true,
         frozenPoints: true,
+        role: true,
+        merchantName: true,
+        merchantDesc: true,
+        merchantContact: true,
         createdAt: true,
       },
     }),
@@ -263,7 +271,7 @@ async function resetUserPassword(id, newPassword) {
   return { message: '密码已重置' };
 }
 
-async function adjustUserPoints(id, amount, reason) {
+async function adjustUserPoints(id, amount, reason, adminId) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new Error('用户不存在');
 
@@ -291,6 +299,17 @@ async function adjustUserPoints(id, amount, reason) {
         beforeBalance,
         afterBalance,
         description: `[管理员调整] ${reason}`,
+      },
+    }),
+    prisma.pointsAdjustmentLog.create({
+      data: {
+        adminId: adminId || null,
+        targetUserId: id,
+        targetType: 'single',
+        amount,
+        reason,
+        beforeBalance,
+        afterBalance,
       },
     }),
   ]);
@@ -798,9 +817,94 @@ async function getLogs({ page = 1, pageSize = 20, action = '', startTime = '', e
   return { list, total };
 }
 
+// ========== 商家管理 ==========
+
+/**
+ * 管理员修改自己的密码
+ */
+async function changeAdminPassword(adminId, oldPassword, newPassword) {
+  const admin = await prisma.adminUser.findUnique({ where: { id: adminId } });
+  if (!admin) throw new Error('管理员不存在');
+
+  // 验证旧密码
+  const isMatch = await bcrypt.compare(oldPassword, admin.password);
+  if (!isMatch) throw new Error('旧密码不正确');
+
+  // 新密码不能与旧密码相同
+  const isSame = await bcrypt.compare(newPassword, admin.password);
+  if (isSame) throw new Error('新密码不能与旧密码相同');
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await prisma.adminUser.update({
+    where: { id: adminId },
+    data: { password: hashedPassword },
+  });
+
+  return { message: '密码修改成功' };
+}
+
+async function updateUserRole(id, data) {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new Error('用户不存在');
+
+  const updateData = { role: data.role };
+  if (data.role === 'merchant') {
+    updateData.merchantName = data.merchantName || null;
+    updateData.merchantDesc = data.merchantDesc || null;
+    updateData.merchantContact = data.merchantContact || null;
+  } else {
+    // 取消商家时清空商家信息
+    updateData.merchantName = null;
+    updateData.merchantDesc = null;
+    updateData.merchantContact = null;
+  }
+
+  return prisma.user.update({
+    where: { id },
+    data: updateData,
+    select: {
+      id: true,
+      nickname: true,
+      email: true,
+      role: true,
+      merchantName: true,
+      merchantDesc: true,
+      merchantContact: true,
+    },
+  });
+}
+
+async function getMerchants({ page = 1, pageSize = 20 }) {
+  const where = { role: 'merchant' };
+
+  const [list, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        nickname: true,
+        avatarUrl: true,
+        email: true,
+        merchantName: true,
+        merchantDesc: true,
+        merchantContact: true,
+        totalPoints: true,
+        createdAt: true,
+      },
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  return { list, total };
+}
+
 module.exports = {
   ensureDefaultAdmin,
   login,
+  changeAdminPassword,
   createLog,
   getDashboard,
   getUsers,
@@ -809,6 +913,8 @@ module.exports = {
   resetUserPassword,
   adjustUserPoints,
   adjustUserCredit,
+  updateUserRole,
+  getMerchants,
   getPosts,
   getPostDetail,
   updatePostStatus,

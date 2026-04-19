@@ -21,14 +21,14 @@
           />
         </van-cell-group>
         <van-cell-group inset class="mt-12">
-          <div class="uploader-label">图片上传（最多5张，每张不超过2MB）</div>
+          <div class="uploader-label">图片上传（最多5张，每张不超过10MB）</div>
           <van-uploader
             v-model="fileList"
             multiple
             :max-count="5"
             :after-read="afterRead"
             @delete="onDelete"
-            :max-size="2 * 1024 * 1024"
+            :max-size="10 * 1024 * 1024"
             @oversize="onOversize"
           />
         </van-cell-group>
@@ -131,7 +131,7 @@ const onDelete = (file, detail) => {
 }
 
 const onOversize = () => {
-  showFailToast('图片大小不能超过2MB')
+  showFailToast('图片大小不能超过10MB')
 }
 
 const onSubmit = async () => {
@@ -149,23 +149,20 @@ const onSubmit = async () => {
   // Bug3修复：使用 orderId 而非 postId
   submitting.value = true
   try {
+    console.log('[ORDER-SUBMIT] 开始提交任务, orderId:', order.value.id)
     await submitOrder(order.value.id, {
       description: form.value.description || null,
       images: uploadedImages.value.length > 0 ? JSON.stringify(uploadedImages.value) : null
     })
-    showSuccessToast('提交成功')
-    // 根据来源页面决定返回逻辑
-    if (fromPage === 'my-orders') {
-      // 从我的接单进来，直接返回我的接单页面
-      router.replace('/my/orders')
-    } else {
-      // 从帖子详情进来，返回帖子详情
-      router.replace(`/post/${postId}`)
-    }
-  } catch (error) {
-    showFailToast(error.message || '提交失败')
-  } finally {
+    console.log('[ORDER-SUBMIT] 提交成功, 准备跳转...')
     submitting.value = false
+    showSuccessToast('提交成功')
+    // 提交成功后跳转到我的接单列表
+    window.location.replace('/my/orders')
+  } catch (error) {
+    console.error('[ORDER-SUBMIT] 提交失败:', error)
+    submitting.value = false
+    showFailToast(error.message || '提交失败')
   }
 }
 

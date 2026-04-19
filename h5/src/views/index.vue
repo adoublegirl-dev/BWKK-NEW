@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onActivated, nextTick } from 'vue'
+import { ref, onMounted, onActivated, onDeactivated, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
 import PostCard from '@/components/PostCard.vue'
@@ -87,19 +87,14 @@ const sortOptions = [
   { label: '最新', value: 'latest', icon: 'clock-o' },
   { label: '赏金', value: 'reward', icon: 'gold-coin-o' },
   { label: '距离', value: 'nearest', icon: 'location-o' },
+  { label: '商家', value: 'merchant', icon: 'shop-o' },
 ]
 
-onMounted(() => {
-  // 只在首次进入时尝试自动定位
-  if (!locationAttempted.value) {
-    getCurrentLocation()
-  }
-  // van-list 会自动触发 onLoad，不需要手动调用 loadPosts
-})
 
-// keep-alive 激活时：
+// 防止 van-list @load 和手动调用 loadPosts 并发导致帖子重复
 // - 从发布页返回（query.refresh=1）→ 刷新列表以显示新帖子
 // - 从详情页返回 → 保持当前列表状态和滚动位置
+// - TabBar再次点击首页 → 通过自定义事件触发刷新
 onActivated(() => {
   if (route.query.refresh === '1') {
     // 清理 URL 参数（不触发路由导航）
@@ -109,6 +104,29 @@ onActivated(() => {
     })
   }
   // 否则保持当前状态，不刷新
+})
+
+// 监听 TabBar 首页重复点击刷新事件
+const onHomeRefresh = () => {
+  currentSort.value = 'latest'
+  onRefresh()
+}
+onMounted(() => {
+  window.addEventListener('home-refresh', onHomeRefresh)
+  // 只在首次进入时尝试自动定位
+  if (!locationAttempted.value) {
+    getCurrentLocation()
+  }
+  // 首次加载时也检查刷新参数（兜底 onActivated 未触发的情况）
+  if (route.query.refresh === '1') {
+    window.history.replaceState({}, '', '/')
+    nextTick(() => {
+      onRefresh()
+    })
+  }
+})
+onDeactivated(() => {
+  window.removeEventListener('home-refresh', onHomeRefresh)
 })
 
 // 获取当前定位
@@ -212,10 +230,15 @@ const loadPosts = async () => {
     const params = {
       page: page.value,
       pageSize: 10,
-      sort: currentSort.value,
+      sort: currentSort.value === 'merchant' ? 'latest' : currentSort.value,
       keyword: searchKeyword.value || undefined,
       latitude: currentLocation.value?.latitude,
       longitude: currentLocation.value?.longitude
+    }
+    
+    // 商家tab筛选
+    if (currentSort.value === 'merchant') {
+      params.postType = 'merchant'
     }
     
     const res = await getPosts(params)
@@ -268,13 +291,13 @@ const onSearch = () => {
   loadPosts()
 }
 
-// 切换排序
+// 切换排序（允许重复点击当前排序刷新数据）
 const onSortChange = (sort) => {
   if (sort === 'nearest' && !currentLocation.value) {
     showToast('请先开启定位权限')
     return
   }
-  if (currentSort.value === sort) return
+  // 商家tab不需要定位
   currentSort.value = sort
   page.value = 1
   postList.value = []

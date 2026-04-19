@@ -43,7 +43,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 2 * 1024 * 1024, // 2MB
+    fileSize: 10 * 1024 * 1024, // 10MB
   }
 });
 
@@ -56,7 +56,7 @@ router.post('/image', authMiddleware, (req, res, next) => {
   upload.single('image')(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return next(new ApiError(400, '图片大小不能超过2MB'));
+        return next(new ApiError(400, '图片大小不能超过10MB'));
       }
       return next(new ApiError(400, err.message || '图片上传失败'));
     }

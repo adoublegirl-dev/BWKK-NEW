@@ -17,6 +17,7 @@ const shopRoutes = require('./routes/shop');
 const uploadRoutes = require('./routes/upload');
 const moderateRoutes = require('./routes/moderate');
 const adminRoutes = require('./routes/admin');
+const merchantRoutes = require('./routes/merchant');
 
 // 管理后台服务（确保默认管理员存在）
 const adminService = require('./services/admin.service');
@@ -26,6 +27,7 @@ const app = express();
 // 启动时校验关键安全配置
 const requiredEnvVars = ['JWT_SECRET', 'ADMIN_JWT_SECRET'];
 const missing = requiredEnvVars.filter(v => !process.env[v]);
+// MERCHANT_JWT_SECRET 可选，未设置时自动基于 JWT_SECRET 派生
 if (missing.length > 0) {
   console.error(`\n❌ 缺少必要的环境变量: ${missing.join(', ')}`);
   console.error('请在 .env 文件中配置这些变量后重启服务。\n');
@@ -58,6 +60,9 @@ app.use('/api/shop', shopRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/moderate', moderateRoutes);
 
+// 商家路由（H5轻量入口 + 商家管理后台）
+app.use('/api/merchant', merchantRoutes);
+
 // 健康检查
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -77,6 +82,8 @@ app.get('/api/health', (_req, res) => {
 app.use(express.static(path.join(__dirname, '../../h5')));
 // Admin 前端静态文件
 app.use('/admin', express.static(path.join(__dirname, '../../admin')));
+// Merchant 前端静态文件
+app.use('/merchant', express.static(path.join(__dirname, '../../merchant')));
 
 // H5 SPA fallback（非 API 路径返回 index.html）
 app.get('*', (req, res, next) => {
@@ -87,6 +94,10 @@ app.get('*', (req, res, next) => {
   // Admin SPA fallback
   if (req.path.startsWith('/admin')) {
     return res.sendFile(path.join(__dirname, '../../admin/index.html'));
+  }
+  // Merchant SPA fallback
+  if (req.path.startsWith('/merchant')) {
+    return res.sendFile(path.join(__dirname, '../../merchant/index.html'));
   }
   // H5 SPA fallback
   res.sendFile(path.join(__dirname, '../../h5/index.html'));

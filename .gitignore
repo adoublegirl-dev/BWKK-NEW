@@ -44,3 +44,14 @@ test-token.txt
 clear-*.js
 list-*.js
 set-password.js
+
+# 部署/测试/修复临时脚本
+fix_*.py
+fix_*.js
+deploy*.py
+check_db*
+debug_db.py
+verify_server.py
+save_pm2.py
+bwkk_test*
+.test_admin_token.txt

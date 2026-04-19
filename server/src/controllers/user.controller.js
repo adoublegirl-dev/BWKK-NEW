@@ -63,6 +63,10 @@ const getProfile = async (req, res, next) => {
         frozenUntil: true,
         totalPoints: true,
         frozenPoints: true,
+        role: true,
+        merchantName: true,
+        merchantDesc: true,
+        merchantContact: true,
         createdAt: true,
       },
     });

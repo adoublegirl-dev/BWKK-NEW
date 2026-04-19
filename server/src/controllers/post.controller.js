@@ -10,7 +10,7 @@ const { ApiError, success, successWithPagination } = require('../utils/response'
  */
 const getPosts = async (req, res, next) => {
   try {
-    const { page, pageSize, sort, city, latitude, longitude } = req.query;
+    const { page, pageSize, sort, city, latitude, longitude, postType } = req.query;
     const result = await postService.getPosts({
       page: parseInt(page) || 1,
       pageSize: parseInt(pageSize) || 20,
@@ -18,6 +18,7 @@ const getPosts = async (req, res, next) => {
       city,
       latitude: latitude ? parseFloat(latitude) : null,
       longitude: longitude ? parseFloat(longitude) : null,
+      postType: postType || 'all',
     });
     successWithPagination(res, result.list, {
       total: result.total,

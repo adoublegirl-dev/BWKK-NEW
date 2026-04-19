@@ -69,6 +69,30 @@ const routes = [
     meta: { title: '积分商城' }
   },
   {
+    path: '/shop/:id',
+    name: 'ShopDetail',
+    component: () => import('@/views/shop-detail.vue'),
+    meta: { title: '商品详情' }
+  },
+  {
+    path: '/my/exchanges',
+    name: 'MyExchanges',
+    component: () => import('@/views/my-exchanges.vue'),
+    meta: { title: '已兑换', auth: true }
+  },
+  {
+    path: '/merchant/home',
+    name: 'MerchantHome',
+    component: () => import('@/views/merchant-home.vue'),
+    meta: { title: '商家中心', auth: true }
+  },
+  {
+    path: '/merchant/redeem',
+    name: 'MerchantRedeem',
+    component: () => import('@/views/merchant-redeem.vue'),
+    meta: { title: '核销代金券', auth: true }
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/login.vue'),

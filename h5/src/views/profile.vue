@@ -40,6 +40,12 @@
       <van-cell title="积分明细" icon="gold-coin-o" is-link to="/points" />
       <van-cell title="信用分" icon="certificate" is-link to="/credit" />
       <van-cell title="积分商城" icon="shop-o" is-link to="/shop" />
+      <van-cell title="已兑换" icon="exchange" is-link to="/my/exchanges" />
+    </van-cell-group>
+    
+    <van-cell-group v-if="isMerchant" inset class="menu-group">
+      <van-cell title="商家中心" icon="manager-o" is-link to="/merchant/home" />
+      <van-cell title="核销代金券" icon="scan" is-link to="/merchant/redeem" />
     </van-cell-group>
     
     <van-cell-group inset class="menu-group">
@@ -70,6 +76,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const userInfo = computed(() => authStore.userInfo)
 const availablePoints = computed(() => authStore.availablePoints)
+const isMerchant = computed(() => authStore.userInfo?.role === 'merchant')
 
 // 红点/未读数据
 const unreadSubmissions = ref(0)

@@ -11,12 +11,17 @@ const { validateRequired, validatePoints, validateCoordinates } = require('../ut
  * 获取帖子列表
  * @param {{ page?: number, pageSize?: number, sort?: string, city?: string, userId?: string }} params
  */
-const getPosts = async ({ page = 1, pageSize = 20, sort = 'latest', city, latitude, longitude }) => {
+const getPosts = async ({ page = 1, pageSize = 20, sort = 'latest', city, latitude, longitude, postType }) => {
   const where = { status: 'active' };
 
   // 按城市筛选（使用 locationName 模糊匹配）
   if (city && !['当前位置', '定位中', '定位中...'].includes(city)) {
     where.locationName = { contains: city };
+  }
+
+  // 按帖子类型筛选（normal/merchant/all）
+  if (postType && postType !== 'all') {
+    where.postType = postType;
   }
 
   // 排序
@@ -359,12 +364,12 @@ const getMyPosts = async (userId, { page = 1, pageSize = 20, status } = {}) => {
       viewTimeMap[pv.id] = pv.lastViewedSubmissionsAt;
     }
 
-    // 查询所有已提交/已选中的订单数量，以及每个帖子的未读数
+    // 查询所有接单/提交/选中的订单数量
     const submittedCounts = await prisma.order.groupBy({
       by: ['postId'],
       where: {
         postId: { in: postIds },
-        status: { in: ['submitted', 'selected'] },
+        status: { in: ['accepted', 'submitted', 'selected'] },
       },
       _count: true,
     });
@@ -374,22 +379,30 @@ const getMyPosts = async (userId, { page = 1, pageSize = 20, status } = {}) => {
       countMap[sc.postId] = sc._count;
     }
 
-    // 查询每个帖子在 lastViewedSubmissionsAt 之后的提交数
+    // 查询每个帖子的未读数（accepted用createdAt，submitted/selected用submittedAt）
     for (const p of list) {
       const viewTime = viewTimeMap[p.id];
       if (!viewTime) {
-        // 从未查看过，所有提交都是未读
+        // 从未查看过，所有接单和提交都是未读
         unreadMap[p.id] = countMap[p.id] || 0;
       } else {
-        // 只统计查看时间之后的提交
-        const unreadCount = await prisma.order.count({
+        // 统计查看时间之后新接单的（accepted，用createdAt）
+        const newAccepted = await prisma.order.count({
+          where: {
+            postId: p.id,
+            status: 'accepted',
+            createdAt: { gt: viewTime },
+          },
+        });
+        // 统计查看时间之后新提交/选中的（submitted/selected，用submittedAt）
+        const newSubmitted = await prisma.order.count({
           where: {
             postId: p.id,
             status: { in: ['submitted', 'selected'] },
             submittedAt: { gt: viewTime },
           },
         });
-        unreadMap[p.id] = unreadCount;
+        unreadMap[p.id] = newAccepted + newSubmitted;
       }
     }
   }
@@ -474,15 +487,34 @@ const getPostBadges = async (userId) => {
 
   let totalUnread = 0;
   for (const post of myPosts) {
-    const where = {
-      postId: post.id,
-      status: { in: ['submitted', 'selected'] },
-    };
     if (post.lastViewedSubmissionsAt) {
-      where.submittedAt = { gt: post.lastViewedSubmissionsAt };
+      // 查看时间之后新接单的（accepted 状态用 createdAt）
+      const newAccepted = await prisma.order.count({
+        where: {
+          postId: post.id,
+          status: 'accepted',
+          createdAt: { gt: post.lastViewedSubmissionsAt },
+        },
+      });
+      // 查看时间之后新提交/选中的（submitted/selected 状态用 submittedAt）
+      const newSubmitted = await prisma.order.count({
+        where: {
+          postId: post.id,
+          status: { in: ['submitted', 'selected'] },
+          submittedAt: { gt: post.lastViewedSubmissionsAt },
+        },
+      });
+      totalUnread += newAccepted + newSubmitted;
+    } else {
+      // 从未查看过，所有接单（accepted）和提交（submitted/selected）都算未读
+      const count = await prisma.order.count({
+        where: {
+          postId: post.id,
+          status: { in: ['accepted', 'submitted', 'selected'] },
+        },
+      });
+      totalUnread += count;
     }
-    const count = await prisma.order.count({ where });
-    totalUnread += count;
   }
 
   return { unreadSubmissions: totalUnread };

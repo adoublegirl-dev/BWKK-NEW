@@ -344,28 +344,15 @@ const acceptOrder = async () => {
   }
   
   try {
-    await apiAcceptOrder(postId)
+    console.log('[POST-DETAIL] 开始接单, postId:', postId)
+    const result = await apiAcceptOrder(postId)
+    console.log('[POST-DETAIL] 接单API返回成功:', result)
     showSuccessToast('接单成功')
-    // 刷新帖子详情以更新订单状态
-    await loadPostDetail()
-    
-    // 接单成功后弹窗引导提交
-    showConfirmDialog({
-      title: '接单成功',
-      message: '是否现在就去提交任务？',
-      confirmButtonText: '去提交',
-      cancelButtonText: '稍后再说'
-    }).then(() => {
-      // 用户选择提交，跳转提交页面并携带来源参数
-      router.push({
-        path: `/order/submit/${postId}`,
-        query: route.query.from ? { from: route.query.from } : {}
-      })
-    }).catch(() => {
-      // 用户取消，显示提示
-      showToast('您可以稍后在"我的接单"中执行提交操作')
-    })
+    console.log('[POST-DETAIL] 准备跳转到我的接单...')
+    // 直接跳转，不使用 setTimeout，不使用 Vue Router
+    window.location.replace('/my/orders')
   } catch (error) {
+    console.error('[POST-DETAIL] 接单失败:', error)
     showFailToast(error.message || '接单失败')
   }
 }

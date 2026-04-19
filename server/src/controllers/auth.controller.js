@@ -11,6 +11,7 @@ const emailService = require('../services/email.service');
 const { generateDefaultAvatar, sanitizeText } = require('./user.controller');
 const { ApiError, success } = require('../utils/response');
 const { validateWxCode, validateEmail } = require('../utils/validator');
+const { validatePasswordStrength, checkLoginLock, recordLoginFailure, recordLoginSuccess, userAuthLimiter } = require('../middleware/login-security');
 
 /**
  * 生成JWT Token
@@ -47,6 +48,8 @@ const formatUserInfo = (user) => ({
   posterCredit: user.posterCredit,
   doerCredit: user.doerCredit,
   creditStatus: user.creditStatus,
+  role: user.role || 'normal',
+  merchantName: user.merchantName || null,
 });
 
 /**
@@ -229,6 +232,13 @@ const loginEmail = async (req, res, next) => {
     if (!user) {
       // 新用户注册，赠送100初始积分
       isNewUser = true;
+      // 密码强度校验（如果提供了密码）
+      if (password) {
+        const strengthCheck = validatePasswordStrength(password);
+        if (!strengthCheck.valid) {
+          throw new ApiError(400, strengthCheck.message);
+        }
+      }
       const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
       const safeNickname = sanitizeText(nickname) || `用户${Date.now().toString(36)}`;
       user = await prisma.user.create({
@@ -253,6 +263,10 @@ const loginEmail = async (req, res, next) => {
       
       // 如果提供了密码，则加密后更新
       if (password) {
+        const strengthCheck = validatePasswordStrength(password);
+        if (!strengthCheck.valid) {
+          throw new ApiError(400, strengthCheck.message);
+        }
         updateData.password = await bcrypt.hash(password, 10);
       }
       
@@ -295,16 +309,25 @@ const loginPassword = async (req, res, next) => {
       throw new ApiError(400, '请输入密码');
     }
 
+    // 检查登录锁定
+    const clientIp = req.ip || req.connection.remoteAddress;
+    const lockStatus = checkLoginLock('user', email, clientIp);
+    if (lockStatus.locked) {
+      throw new ApiError(423, `账号已锁定，请${Math.ceil(lockStatus.remainingSeconds / 60)}分钟后再试`);
+    }
+
     // 查找用户
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
+      recordLoginFailure('user', email, clientIp);
       throw new ApiError(401, '邮箱或密码错误');
     }
 
     if (!user.password) {
+      recordLoginFailure('user', email, clientIp);
       throw new ApiError(401, '邮箱或密码错误');
     }
 
@@ -326,8 +349,15 @@ const loginPassword = async (req, res, next) => {
     }
 
     if (!isPasswordValid) {
-      throw new ApiError(401, '邮箱或密码错误');
+      const failResult = recordLoginFailure('user', email, clientIp);
+      if (failResult.locked) {
+        throw new ApiError(423, '连续登录失败次数过多，账号已锁定15分钟');
+      }
+      throw new ApiError(401, '邮箱或密码错误' + (failResult.attemptsLeft <= 3 ? `，还剩${failResult.attemptsLeft}次尝试机会` : ''));
     }
+
+    // 登录成功，清除失败记录
+    recordLoginSuccess('user', email, clientIp);
 
     // 签发JWT
     const token = generateToken(user, 'email');

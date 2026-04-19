@@ -46,4 +46,20 @@ const orderLimiter = rateLimit({
   keyGenerator: (req) => req.user?.id || req.ip,
 });
 
-module.exports = { apiLimiter, postLimiter, orderLimiter };
+/**
+ * 代金券兑换码查询限流
+ * 每个IP每分钟5次（防暴力破解）
+ */
+const voucherLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: {
+    code: 429,
+    message: '查询过于频繁，请稍后再试',
+    data: null,
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+module.exports = { apiLimiter, postLimiter, orderLimiter, voucherLimiter };

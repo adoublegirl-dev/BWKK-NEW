@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const { authMiddleware } = require('../middleware/auth');
+const { userAuthLimiter } = require('../middleware/login-security');
 
 /**
  * @route   POST /api/auth/login
@@ -14,7 +15,7 @@ router.post('/login', authController.login);
  * @desc    发送邮箱验证码
  * @body    { email: string, type?: string }
  */
-router.post('/send-email-code', authController.sendEmailCode);
+router.post('/send-email-code', userAuthLimiter, authController.sendEmailCode);
 
 /**
  * @route   POST /api/auth/verify-email-code
@@ -28,14 +29,14 @@ router.post('/verify-email-code', authController.verifyEmailCode);
  * @desc    邮箱验证码登录/注册
  * @body    { email: string, verifyToken: string, nickname?: string, password?: string }
  */
-router.post('/login-email', authController.loginEmail);
+router.post('/login-email', userAuthLimiter, authController.loginEmail);
 
 /**
  * @route   POST /api/auth/login-password
  * @desc    邮箱+密码登录
  * @body    { email: string, password: string }
  */
-router.post('/login-password', authController.loginPassword);
+router.post('/login-password', userAuthLimiter, authController.loginPassword);
 
 /**
  * @route   POST /api/auth/bind-wechat

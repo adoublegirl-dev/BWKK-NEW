@@ -23,7 +23,8 @@ request.interceptors.request.use(
 request.interceptors.response.use(
   (response) => {
     const res = response.data
-    if (res.code !== 200) {
+    // 接受所有 2xx 状态码（200, 201 等）
+    if (res.code !== 200 && !(res.code >= 200 && res.code < 300)) {
       ElMessage.error(res.message || '请求失败')
       // token 过期或无效
       if (res.code === 401) {
