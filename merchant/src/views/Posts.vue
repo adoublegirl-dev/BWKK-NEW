@@ -12,7 +12,8 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="悬赏积分" prop="rewardAmount">
-              <el-input-number v-model="createForm.rewardAmount" :min="1" />
+              <el-input-number v-model="createForm.rewardAmount" :min="createForm.rewardType === 'voucher' ? 0 : 1" />
+              <span v-if="createForm.rewardType === 'voucher'" style="margin-left:8px;color:#909399;font-size:12px;">代金券奖励时积分可为0</span>
             </el-form-item>
           </el-col>
         </el-row>
@@ -22,7 +23,15 @@
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="截止时间" prop="deadline">
-              <el-date-picker v-model="createForm.deadline" type="datetime" placeholder="选择截止时间" style="width: 100%" />
+              <el-date-picker
+                v-model="createForm.deadline"
+                type="datetime"
+                placeholder="选择截止时间"
+                style="width: 100%"
+                :disabled-date="disabledDate"
+                format="YYYY-MM-DD HH:mm"
+                value-format="YYYY-MM-DDTHH:mm:ss"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -41,9 +50,24 @@
           </el-col>
           <el-col :span="4">
             <el-form-item label="奖励类型">
-              <el-select v-model="createForm.rewardType">
+              <el-select v-model="createForm.rewardType" @change="onRewardTypeChange">
                 <el-option label="积分" value="points" />
                 <el-option label="代金券" value="voucher" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <!-- 代金券批次选择（奖励类型为代金券时显示） -->
+        <el-row v-if="createForm.rewardType === 'voucher'" :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="代金券批次" prop="voucherBatchId">
+              <el-select v-model="createForm.voucherBatchId" placeholder="请选择代金券批次" style="width: 100%">
+                <el-option
+                  v-for="batch in voucherBatches"
+                  :key="batch.id"
+                  :label="`${batch.name}（${batch.faceValue}元 × ${batch.remainingQty}张）`"
+                  :value="batch.id"
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -127,7 +151,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getMerchantPosts, getMerchantPostDetail, createMerchantPost } from '../api/merchant'
+import { getMerchantPosts, getMerchantPostDetail, createMerchantPost, getVoucherBatches } from '../api/merchant'
 
 const loading = ref(false)
 const posts = ref([])
@@ -145,13 +169,53 @@ const createForm = reactive({
   deadline: null,
   selectionMode: 'manual',
   selectionCount: 1,
-  rewardType: 'points'
+  rewardType: 'points',
+  voucherBatchId: null
 })
+
+const voucherBatches = ref([])
+
+// 禁用今天之前的日期
+function disabledDate(time) {
+  return time.getTime() < Date.now() - 86400000
+}
 
 const createRules = {
   description: [{ required: true, message: '请输入需求描述', trigger: 'blur' }],
   rewardAmount: [{ required: true, message: '请输入悬赏积分', trigger: 'blur' }],
-  deadline: [{ required: true, message: '请选择截止时间', trigger: 'change' }]
+  deadline: [{ required: true, message: '请选择截止时间', trigger: 'change' }],
+  voucherBatchId: [{
+    validator: (rule, value, callback) => {
+      if (createForm.rewardType === 'voucher' && !value) {
+        callback(new Error('请选择代金券批次'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'change'
+  }]
+}
+
+// 加载代金券批次
+async function loadVoucherBatches() {
+  try {
+    const res = await getVoucherBatches({ pageSize: 100 })
+    voucherBatches.value = (res.data?.list || res.data || []).filter(b => b.remainingQty > 0)
+  } catch (e) {
+    console.error('加载代金券批次失败', e)
+  }
+}
+
+// 奖励类型变化时重置代金券批次和积分
+function onRewardTypeChange() {
+  if (createForm.rewardType === 'voucher') {
+    createForm.voucherBatchId = null
+    createForm.rewardAmount = 0
+    loadVoucherBatches()
+  } else {
+    createForm.voucherBatchId = null
+    if (createForm.rewardAmount < 1) createForm.rewardAmount = 1
+  }
 }
 
 // 帖子详情
@@ -208,13 +272,20 @@ async function onCreatePost() {
       ...createForm,
       title: createForm.title || '帮我看看',
       postType: 'merchant',
-      deadline: createForm.deadline?.toISOString()
+      deadline: typeof createForm.deadline === 'string'
+        ? createForm.deadline
+        : createForm.deadline?.toISOString()
+    }
+    // 代金券类型时清理 voucherBatchId
+    if (createForm.rewardType !== 'voucher') {
+      delete data.voucherBatchId
     }
     await createMerchantPost(data)
     ElMessage.success('发布成功')
     createForm.title = ''
     createForm.description = ''
     createForm.deadline = null
+    createForm.voucherBatchId = null
     loadPosts()
   } catch (e) {
     ElMessage.error(e.message || '发布失败')
