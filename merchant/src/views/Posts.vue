@@ -182,7 +182,20 @@ function disabledDate(time) {
 
 const createRules = {
   description: [{ required: true, message: '请输入需求描述', trigger: 'blur' }],
-  rewardAmount: [{ required: true, message: '请输入悬赏积分', trigger: 'blur' }],
+  rewardAmount: [{
+    validator: (rule, value, callback) => {
+      if (value === null || value === undefined || value === '') {
+        callback(new Error('请输入悬赏积分'))
+      } else if (createForm.rewardType === 'points' && value < 1) {
+        callback(new Error('积分奖励时悬赏至少为1'))
+      } else if (value < 0) {
+        callback(new Error('悬赏积分不能为负数'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'blur'
+  }],
   deadline: [{ required: true, message: '请选择截止时间', trigger: 'change' }],
   voucherBatchId: [{
     validator: (rule, value, callback) => {
